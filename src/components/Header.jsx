@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Bell, Clock, User } from 'lucide-react';
+import { Search, Bell, Clock, User, Menu } from 'lucide-react';
 
-export default function Header({ activeTab, activeSubTab, onSearchChange, notificationCount = 3, onAlertClick }) {
+export default function Header({ activeTab, activeSubTab, onSearchChange, notificationCount = 3, onAlertClick, onToggleSidebar }) {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export default function Header({ activeTab, activeSubTab, onSearchChange, notifi
     return (
       <div className="header-title-area">
         <h2>{subText ? subText : mainText}</h2>
-        <p>
+        <p className="breadcrumb-subtext">
           Nandhi Motors &gt; {mainText} {subText ? `> ${subText}` : ''}
         </p>
       </div>
@@ -52,6 +52,14 @@ export default function Header({ activeTab, activeSubTab, onSearchChange, notifi
   return (
     <header className="header">
       <div className="header-left">
+        <button
+          type="button"
+          className="mobile-menu-toggle"
+          onClick={onToggleSidebar}
+          aria-label="Toggle navigation menu"
+        >
+          <Menu size={22} />
+        </button>
         {formatBreadcrumb()}
       </div>
 

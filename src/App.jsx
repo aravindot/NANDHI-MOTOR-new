@@ -22,6 +22,7 @@ export default function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeSubTab, setActiveSubTab] = useState(null);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Shared Leads Database with localStorage Persistence
   const [leads, setLeads] = useState(() => {
@@ -913,6 +914,8 @@ export default function App() {
         activeTab={activeTab}
         activeSubTab={activeSubTab}
         onChangeTab={handleTabChange}
+        isOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* 2. Main Content Wrapper */}
@@ -924,6 +927,7 @@ export default function App() {
           onSearchChange={(query) => console.log('Searching:', query)}
           notificationCount={alertCount}
           onAlertClick={() => handleTabChange('management', 'alerts')}
+          onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
         />
 
         {/* Dynamic Page body */}

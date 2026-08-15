@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: nandhi-motor-backend
+    env: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false # Set your MongoDB Atlas connection string in Render Dashboard

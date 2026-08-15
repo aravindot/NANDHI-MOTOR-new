@@ -16,6 +16,7 @@ import AlertsPage from './components/pages/AlertsPage';
 import BirthdayWishesPage from './components/pages/BirthdayWishesPage';
 import RedeemPointsPage from './components/pages/RedeemPointsPage';
 import CompanyProfilePage from './components/pages/CompanyProfilePage';
+import { API_BASE_URL } from './config/api';
 
 export default function App() {
   // Navigation State
@@ -189,11 +190,11 @@ export default function App() {
     localStorage.setItem('nandhi_show_previews', JSON.stringify(showPreviews));
   }, [showPreviews]);
 
-  // Fetch initial data from local MongoDB backend on mount (MERGE WITHOUT OVERWRITING USER DATA)
+  // Fetch initial data from backend on mount (MERGE WITHOUT OVERWRITING USER DATA)
   useEffect(() => {
     const initData = async () => {
       try {
-        const vRes = await fetch('http://localhost:5000/api/vehicles');
+        const vRes = await fetch(`${API_BASE_URL}/api/vehicles`);
         if (vRes.ok) {
           const vData = await vRes.json();
           if (Array.isArray(vData) && vData.length > 0) {
@@ -201,11 +202,11 @@ export default function App() {
           }
         }
       } catch (e) {
-        console.warn('MongoDB connection fallback to local storage for vehicles.');
+        console.warn('Backend connection fallback to local storage for vehicles.');
       }
 
       try {
-        const lRes = await fetch('http://localhost:5000/api/leads');
+        const lRes = await fetch(`${API_BASE_URL}/api/leads`);
         if (lRes.ok) {
           const lData = await lRes.json();
           if (Array.isArray(lData) && lData.length > 0) {
@@ -213,11 +214,11 @@ export default function App() {
           }
         }
       } catch (e) {
-        console.warn('MongoDB connection fallback to local storage for leads.');
+        console.warn('Backend connection fallback to local storage for leads.');
       }
 
       try {
-        const cRes = await fetch('http://localhost:5000/api/customers');
+        const cRes = await fetch(`${API_BASE_URL}/api/customers`);
         if (cRes.ok) {
           const cData = await cRes.json();
           if (Array.isArray(cData) && cData.length > 0) {
@@ -225,11 +226,11 @@ export default function App() {
           }
         }
       } catch (e) {
-        console.warn('MongoDB connection fallback to local storage for customers.');
+        console.warn('Backend connection fallback to local storage for customers.');
       }
 
       try {
-        const sRes = await fetch('http://localhost:5000/api/spares');
+        const sRes = await fetch(`${API_BASE_URL}/api/spares`);
         if (sRes.ok) {
           const sData = await sRes.json();
           if (Array.isArray(sData) && sData.length > 0) {
@@ -237,11 +238,11 @@ export default function App() {
           }
         }
       } catch (e) {
-        console.warn('MongoDB connection fallback to local storage for spares.');
+        console.warn('Backend connection fallback to local storage for spares.');
       }
 
       try {
-        const invRes = await fetch('http://localhost:5000/api/invoices');
+        const invRes = await fetch(`${API_BASE_URL}/api/invoices`);
         if (invRes.ok) {
           const invData = await invRes.json();
           if (Array.isArray(invData) && invData.length > 0) {
@@ -249,11 +250,11 @@ export default function App() {
           }
         }
       } catch (e) {
-        console.warn('MongoDB connection fallback to local storage for invoices.');
+        console.warn('Backend connection fallback to local storage for invoices.');
       }
 
       try {
-        const qRes = await fetch('http://localhost:5000/api/quotations');
+        const qRes = await fetch(`${API_BASE_URL}/api/quotations`);
         if (qRes.ok) {
           const qData = await qRes.json();
           if (Array.isArray(qData) && qData.length > 0) {
@@ -261,7 +262,7 @@ export default function App() {
           }
         }
       } catch (e) {
-        console.warn('MongoDB connection fallback to local storage for quotations.');
+        console.warn('Backend connection fallback to local storage for quotations.');
       }
     };
     initData();
@@ -273,7 +274,7 @@ export default function App() {
       // Add Vehicle
       const newVeh = updated[0];
       try {
-        const res = await fetch('http://localhost:5000/api/vehicles', {
+        const res = await fetch(`${API_BASE_URL}/api/vehicles`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newVeh)
@@ -290,7 +291,7 @@ export default function App() {
       const deleted = prev.find(pv => !updated.some(uv => uv.id === pv.id));
       if (deleted) {
         try {
-          await fetch(`http://localhost:5000/api/vehicles/${deleted.id}`, {
+          await fetch(`${API_BASE_URL}/api/vehicles/${deleted.id}`, {
             method: 'DELETE'
           });
         } catch (e) {
@@ -318,7 +319,7 @@ export default function App() {
       // Add Lead
       const newLead = updated[0];
       try {
-        const res = await fetch('http://localhost:5000/api/leads', {
+        const res = await fetch(`${API_BASE_URL}/api/leads`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newLead)
@@ -335,7 +336,7 @@ export default function App() {
       const deleted = prev.find(pl => !updated.some(ul => ul.id === pl.id));
       if (deleted) {
         try {
-          await fetch(`http://localhost:5000/api/leads/${deleted.id}`, {
+          await fetch(`${API_BASE_URL}/api/leads/${deleted.id}`, {
             method: 'DELETE'
           });
         } catch (e) {
@@ -364,7 +365,7 @@ export default function App() {
       const deleted = prev.find(pc => !updated.some(uc => uc.id === pc.id));
       if (deleted) {
         try {
-          await fetch(`http://localhost:5000/api/customers/${deleted.id}`, {
+          await fetch(`${API_BASE_URL}/api/customers/${deleted.id}`, {
             method: 'DELETE'
           });
         } catch (e) {
@@ -392,7 +393,7 @@ export default function App() {
       // Add Spare
       const newSpare = updated[0];
       try {
-        const res = await fetch('http://localhost:5000/api/spares', {
+        const res = await fetch(`${API_BASE_URL}/api/spares`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newSpare)
@@ -409,7 +410,7 @@ export default function App() {
       const deleted = prev.find(ps => !updated.some(us => us.id === ps.id));
       if (deleted) {
         try {
-          await fetch(`http://localhost:5000/api/spares/${deleted.id}`, {
+          await fetch(`${API_BASE_URL}/api/spares/${deleted.id}`, {
             method: 'DELETE'
           });
         } catch (e) {
@@ -444,7 +445,7 @@ export default function App() {
     };
 
     try {
-      const res = await fetch('http://localhost:5000/api/customers', {
+      const res = await fetch(`${API_BASE_URL}/api/customers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(customerPayload)
@@ -481,7 +482,7 @@ export default function App() {
   // Add or Update an Invoice in backend database
   const addInvoice = async (invoicePayload) => {
     try {
-      const res = await fetch('http://localhost:5000/api/invoices', {
+      const res = await fetch(`${API_BASE_URL}/api/invoices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(invoicePayload)
@@ -518,7 +519,7 @@ export default function App() {
   // Delete an Invoice from backend database
   const deleteInvoice = async (invoiceNo) => {
     try {
-      await fetch(`http://localhost:5000/api/invoices/${invoiceNo}`, {
+      await fetch(`${API_BASE_URL}/api/invoices/${invoiceNo}`, {
         method: 'DELETE'
       });
     } catch (err) {
@@ -530,7 +531,7 @@ export default function App() {
   // Add or Update a Quotation in backend database
   const addQuotation = async (quotePayload) => {
     try {
-      const res = await fetch('http://localhost:5000/api/quotations', {
+      const res = await fetch(`${API_BASE_URL}/api/quotations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(quotePayload)
@@ -567,7 +568,7 @@ export default function App() {
   // Delete a Quotation from backend database
   const deleteQuotation = async (quoteId) => {
     try {
-      await fetch(`http://localhost:5000/api/quotations/${quoteId}`, {
+      await fetch(`${API_BASE_URL}/api/quotations/${quoteId}`, {
         method: 'DELETE'
       });
     } catch (err) {

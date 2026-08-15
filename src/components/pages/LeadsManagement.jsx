@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, Phone, CheckCircle, Trash2, Calendar, Clipboard, Calculator, Printer, FileCode, Edit2, MessageCircle, BarChart3, Download, Filter, TrendingUp, DollarSign, FileDown } from 'lucide-react';
 import PrintPreviewModal from '../PrintPreviewModal';
 import { generateQuotationPdfAndShare, generateInvoicePdfAndShare } from '../../utils/pdfShareUtil';
+import { API_BASE_URL } from '../../config/api';
 
 export default function LeadsManagement({
   activeSubTab,
@@ -516,7 +517,7 @@ export default function LeadsManagement({
   useEffect(() => {
     const fetchBookings = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/bookings');
+        const res = await fetch(`${API_BASE_URL}/api/bookings`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -534,7 +535,7 @@ export default function LeadsManagement({
 
   const deleteBooking = async (id) => {
     try {
-      await fetch(`http://localhost:5000/api/bookings/${id}`, {
+      await fetch(`${API_BASE_URL}/api/bookings/${id}`, {
         method: 'DELETE'
       });
     } catch (err) {
@@ -552,7 +553,7 @@ export default function LeadsManagement({
     };
 
     try {
-      const res = await fetch('http://localhost:5000/api/bookings', {
+      const res = await fetch(`${API_BASE_URL}/api/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newBooking)

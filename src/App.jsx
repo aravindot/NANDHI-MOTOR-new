@@ -197,72 +197,110 @@ export default function App() {
         const vRes = await fetch(`${API_BASE_URL}/api/vehicles`);
         if (vRes.ok) {
           const vData = await vRes.json();
-          if (Array.isArray(vData) && vData.length > 0) {
-            setVehicles(vData);
-          }
+          if (Array.isArray(vData) && vData.length > 0) setVehicles(vData);
         }
       } catch (e) {
-        console.warn('Backend connection fallback to local storage for vehicles.');
+        console.warn('Fallback to local storage for vehicles.');
       }
 
       try {
         const lRes = await fetch(`${API_BASE_URL}/api/leads`);
         if (lRes.ok) {
           const lData = await lRes.json();
-          if (Array.isArray(lData) && lData.length > 0) {
-            setLeads(lData);
-          }
+          if (Array.isArray(lData) && lData.length > 0) setLeads(lData);
         }
       } catch (e) {
-        console.warn('Backend connection fallback to local storage for leads.');
+        console.warn('Fallback to local storage for leads.');
       }
 
       try {
         const cRes = await fetch(`${API_BASE_URL}/api/customers`);
         if (cRes.ok) {
           const cData = await cRes.json();
-          if (Array.isArray(cData) && cData.length > 0) {
-            setCustomers(cData);
-          }
+          if (Array.isArray(cData) && cData.length > 0) setCustomers(cData);
         }
       } catch (e) {
-        console.warn('Backend connection fallback to local storage for customers.');
+        console.warn('Fallback to local storage for customers.');
       }
 
       try {
         const sRes = await fetch(`${API_BASE_URL}/api/spares`);
         if (sRes.ok) {
           const sData = await sRes.json();
-          if (Array.isArray(sData) && sData.length > 0) {
-            setSpares(sData);
-          }
+          if (Array.isArray(sData) && sData.length > 0) setSpares(sData);
         }
       } catch (e) {
-        console.warn('Backend connection fallback to local storage for spares.');
+        console.warn('Fallback to local storage for spares.');
       }
 
       try {
         const invRes = await fetch(`${API_BASE_URL}/api/invoices`);
         if (invRes.ok) {
           const invData = await invRes.json();
-          if (Array.isArray(invData) && invData.length > 0) {
-            setInvoices(invData);
-          }
+          if (Array.isArray(invData) && invData.length > 0) setInvoices(invData);
         }
       } catch (e) {
-        console.warn('Backend connection fallback to local storage for invoices.');
+        console.warn('Fallback to local storage for invoices.');
       }
 
       try {
         const qRes = await fetch(`${API_BASE_URL}/api/quotations`);
         if (qRes.ok) {
           const qData = await qRes.json();
-          if (Array.isArray(qData) && qData.length > 0) {
-            setQuotations(qData);
-          }
+          if (Array.isArray(qData) && qData.length > 0) setQuotations(qData);
         }
       } catch (e) {
-        console.warn('Backend connection fallback to local storage for quotations.');
+        console.warn('Fallback to local storage for quotations.');
+      }
+
+      try {
+        const jsRes = await fetch(`${API_BASE_URL}/api/jobsheets`);
+        if (jsRes.ok) {
+          const jsData = await jsRes.json();
+          if (Array.isArray(jsData) && jsData.length > 0) setJobSheets(jsData);
+        }
+      } catch (e) {
+        console.warn('Fallback to local storage for job sheets.');
+      }
+
+      try {
+        const sbRes = await fetch(`${API_BASE_URL}/api/service-bills`);
+        if (sbRes.ok) {
+          const sbData = await sbRes.json();
+          if (Array.isArray(sbData) && sbData.length > 0) setServiceBills(sbData);
+        }
+      } catch (e) {
+        console.warn('Fallback to local storage for service bills.');
+      }
+
+      try {
+        const expRes = await fetch(`${API_BASE_URL}/api/expenses`);
+        if (expRes.ok) {
+          const expData = await expRes.json();
+          if (Array.isArray(expData) && expData.length > 0) setDailyExpenses(expData);
+        }
+      } catch (e) {
+        console.warn('Fallback to local storage for expenses.');
+      }
+
+      try {
+        const purRes = await fetch(`${API_BASE_URL}/api/purchases`);
+        if (purRes.ok) {
+          const purData = await purRes.json();
+          if (Array.isArray(purData) && purData.length > 0) setPurchaseInvoices(purData);
+        }
+      } catch (e) {
+        console.warn('Fallback to local storage for purchases.');
+      }
+
+      try {
+        const profRes = await fetch(`${API_BASE_URL}/api/company-profile`);
+        if (profRes.ok) {
+          const profData = await profRes.json();
+          if (profData && profData.name) setCompanyProfile(profData);
+        }
+      } catch (e) {
+        console.warn('Fallback to local storage for company profile.');
       }
     };
     initData();
@@ -577,6 +615,202 @@ export default function App() {
     setQuotations(prev => prev.filter(q => q.quoteId !== quoteId));
   };
 
+  // JobSheets Sync Helpers
+  const syncJobSheetsWithDatabase = async (prev, updated) => {
+    if (updated.length > prev.length) {
+      const newJS = updated[0];
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/jobsheets`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newJS)
+        });
+        if (res.ok) {
+          const saved = await res.json();
+          setJobSheets(current => current.map(item => item.id === newJS.id ? saved : item));
+        }
+      } catch (e) {
+        console.error('Failed to sync added job sheet with MongoDB:', e);
+      }
+    } else if (updated.length < prev.length) {
+      const deleted = prev.find(p => !updated.some(u => u.id === p.id));
+      if (deleted) {
+        try {
+          await fetch(`${API_BASE_URL}/api/jobsheets/${deleted.id}`, { method: 'DELETE' });
+        } catch (e) {
+          console.error('Failed to sync deleted job sheet with MongoDB:', e);
+        }
+      }
+    } else {
+      const edited = updated.find((u, i) => JSON.stringify(u) !== JSON.stringify(prev[i]));
+      if (edited) {
+        try {
+          await fetch(`${API_BASE_URL}/api/jobsheets`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(edited)
+          });
+        } catch (e) {
+          console.error('Failed to sync edited job sheet with MongoDB:', e);
+        }
+      }
+    }
+  };
+
+  const handleSetJobSheets = (action) => {
+    if (typeof action === 'function') {
+      setJobSheets(prev => {
+        const updated = action(prev);
+        syncJobSheetsWithDatabase(prev, updated);
+        return updated;
+      });
+    } else {
+      syncJobSheetsWithDatabase(jobSheets, action);
+      setJobSheets(action);
+    }
+  };
+
+  // ServiceBills Sync Helpers
+  const syncServiceBillsWithDatabase = async (prev, updated) => {
+    if (updated.length > prev.length) {
+      const newBill = updated[0];
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/service-bills`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newBill)
+        });
+        if (res.ok) {
+          const saved = await res.json();
+          setServiceBills(current => current.map(item => item.id === newBill.id ? saved : item));
+        }
+      } catch (e) {
+        console.error('Failed to sync added service bill with MongoDB:', e);
+      }
+    } else if (updated.length < prev.length) {
+      const deleted = prev.find(p => !updated.some(u => u.id === p.id));
+      if (deleted) {
+        try {
+          await fetch(`${API_BASE_URL}/api/service-bills/${deleted.id}`, { method: 'DELETE' });
+        } catch (e) {
+          console.error('Failed to sync deleted service bill with MongoDB:', e);
+        }
+      }
+    }
+  };
+
+  const handleSetServiceBills = (action) => {
+    if (typeof action === 'function') {
+      setServiceBills(prev => {
+        const updated = action(prev);
+        syncServiceBillsWithDatabase(prev, updated);
+        return updated;
+      });
+    } else {
+      syncServiceBillsWithDatabase(serviceBills, action);
+      setServiceBills(action);
+    }
+  };
+
+  // Expenses Sync Helpers
+  const syncExpensesWithDatabase = async (prev, updated) => {
+    if (updated.length > prev.length) {
+      const newExp = updated[0];
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/expenses`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newExp)
+        });
+        if (res.ok) {
+          const saved = await res.json();
+          setDailyExpenses(current => current.map(item => item.id === newExp.id ? saved : item));
+        }
+      } catch (e) {
+        console.error('Failed to sync expense with MongoDB:', e);
+      }
+    } else if (updated.length < prev.length) {
+      const deleted = prev.find(p => !updated.some(u => u.id === p.id));
+      if (deleted) {
+        try {
+          await fetch(`${API_BASE_URL}/api/expenses/${deleted.id}`, { method: 'DELETE' });
+        } catch (e) {
+          console.error('Failed to delete expense from MongoDB:', e);
+        }
+      }
+    }
+  };
+
+  const handleSetDailyExpenses = (action) => {
+    if (typeof action === 'function') {
+      setDailyExpenses(prev => {
+        const updated = action(prev);
+        syncExpensesWithDatabase(prev, updated);
+        return updated;
+      });
+    } else {
+      syncExpensesWithDatabase(dailyExpenses, action);
+      setDailyExpenses(action);
+    }
+  };
+
+  // Purchase Invoices Sync Helpers
+  const syncPurchasesWithDatabase = async (prev, updated) => {
+    if (updated.length > prev.length) {
+      const newPur = updated[0];
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/purchases`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newPur)
+        });
+        if (res.ok) {
+          const saved = await res.json();
+          setPurchaseInvoices(current => current.map(item => item.id === newPur.id ? saved : item));
+        }
+      } catch (e) {
+        console.error('Failed to sync purchase invoice with MongoDB:', e);
+      }
+    } else if (updated.length < prev.length) {
+      const deleted = prev.find(p => !updated.some(u => u.id === p.id));
+      if (deleted) {
+        try {
+          await fetch(`${API_BASE_URL}/api/purchases/${deleted.id}`, { method: 'DELETE' });
+        } catch (e) {
+          console.error('Failed to delete purchase invoice from MongoDB:', e);
+        }
+      }
+    }
+  };
+
+  const handleSetPurchaseInvoices = (action) => {
+    if (typeof action === 'function') {
+      setPurchaseInvoices(prev => {
+        const updated = action(prev);
+        syncPurchasesWithDatabase(prev, updated);
+        return updated;
+      });
+    } else {
+      syncPurchasesWithDatabase(purchaseInvoices, action);
+      setPurchaseInvoices(action);
+    }
+  };
+
+  // Company Profile Sync Helper
+  const handleSetCompanyProfile = async (action) => {
+    const updated = typeof action === 'function' ? action(companyProfile) : action;
+    setCompanyProfile(updated);
+    try {
+      await fetch(`${API_BASE_URL}/api/company-profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+    } catch (e) {
+      console.error('Failed to sync company profile with MongoDB:', e);
+    }
+  };
+
   // System Stats for Dashboard Overview
   const [stats, setStats] = useState({
     leadsToday: 8,
@@ -698,7 +932,7 @@ export default function App() {
             <DashboardOverview
               leads={leads}
               companyProfile={companyProfile}
-              setCompanyProfile={setCompanyProfile}
+              setCompanyProfile={handleSetCompanyProfile}
               onNavigate={handleTabChange}
             />
           ) : activeTab === 'leads' ? (
@@ -722,9 +956,9 @@ export default function App() {
               activeSubTab={activeSubTab}
               setActiveSubTab={setActiveSubTab}
               jobSheets={jobSheets}
-              setJobSheets={setJobSheets}
+              setJobSheets={handleSetJobSheets}
               serviceBills={serviceBills}
-              setServiceBills={setServiceBills}
+              setServiceBills={handleSetServiceBills}
               spares={spares}
               showPreviews={showPreviews}
               customers={customers}
@@ -754,7 +988,7 @@ export default function App() {
               activeSubTab={activeSubTab}
               setActiveSubTab={setActiveSubTab}
               purchaseInvoices={purchaseInvoices}
-              setPurchaseInvoices={setPurchaseInvoices}
+              setPurchaseInvoices={handleSetPurchaseInvoices}
               spares={spares}
               setSpares={handleSetSpares}
               vehicles={vehicles}
@@ -766,7 +1000,7 @@ export default function App() {
               invoices={invoices}
               serviceBills={serviceBills}
               dailyExpenses={dailyExpenses}
-              setDailyExpenses={setDailyExpenses}
+              setDailyExpenses={handleSetDailyExpenses}
               purchaseInvoices={purchaseInvoices}
             />
           ) : activeTab === 'warranty' ? (
@@ -797,7 +1031,7 @@ export default function App() {
           ) : activeTab === 'profile' ? (
             <CompanyProfilePage
               companyProfile={companyProfile}
-              setCompanyProfile={setCompanyProfile}
+              setCompanyProfile={handleSetCompanyProfile}
             />
           ) : (
             renderPlaceholderSection()

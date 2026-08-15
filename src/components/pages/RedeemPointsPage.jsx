@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Gift, Coins, Award, Sparkles, Check, Plus, Search, CheckCircle, Ticket } from 'lucide-react';
+import { API_BASE_URL } from '../../config/api';
 
 export default function RedeemPointsPage({
   customers = []
@@ -101,6 +102,32 @@ export default function RedeemPointsPage({
     ];
   });
 
+  // Initial fetch from backend
+  useEffect(() => {
+    const fetchLoyalty = async () => {
+      try {
+        const bRes = await fetch(`${API_BASE_URL}/api/loyalty-balances`);
+        if (bRes.ok) {
+          const bData = await bRes.json();
+          if (Array.isArray(bData) && bData.length > 0) setLoyaltyBalances(bData);
+        }
+      } catch (err) {
+        console.warn('Fallback to local storage for loyalty balances.');
+      }
+
+      try {
+        const rRes = await fetch(`${API_BASE_URL}/api/redemptions`);
+        if (rRes.ok) {
+          const rData = await rRes.json();
+          if (Array.isArray(rData) && rData.length > 0) setRedemptions(rData);
+        }
+      } catch (err) {
+        console.warn('Fallback to local storage for redemptions.');
+      }
+    };
+    fetchLoyalty();
+  }, []);
+
   React.useEffect(() => {
     localStorage.setItem('nandhi_loyalty_balances', JSON.stringify(loyaltyBalances));
   }, [loyaltyBalances]);
@@ -118,7 +145,7 @@ export default function RedeemPointsPage({
     setIsRedeemModalOpen(true);
   };
 
-  const handleProcessRedeem = (e) => {
+  const handleProcessRedeem = async (e) => {
     e.preventDefault();
     const cust = loyaltyBalances.find(c => c.id === selectedCustomerId);
     if (!cust) return;
@@ -128,17 +155,14 @@ export default function RedeemPointsPage({
       return;
     }
 
+    const updatedCustomer = {
+      ...cust,
+      redeemedPoints: cust.redeemedPoints + selectedReward.pointsRequired,
+      availablePoints: cust.availablePoints - selectedReward.pointsRequired
+    };
+
     // Deduct points
-    setLoyaltyBalances(prev => prev.map(c => {
-      if (c.id === selectedCustomerId) {
-        return {
-          ...c,
-          redeemedPoints: c.redeemedPoints + selectedReward.pointsRequired,
-          availablePoints: c.availablePoints - selectedReward.pointsRequired
-        };
-      }
-      return c;
-    }));
+    setLoyaltyBalances(prev => prev.map(c => c.id === selectedCustomerId ? updatedCustomer : c));
 
     // Add Redemption Record
     const newRedemption = {
@@ -153,6 +177,23 @@ export default function RedeemPointsPage({
     };
 
     setRedemptions([newRedemption, ...redemptions]);
+
+    // Sync to MongoDB
+    try {
+      await fetch(`${API_BASE_URL}/api/loyalty-balances`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedCustomer)
+      });
+      await fetch(`${API_BASE_URL}/api/redemptions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRedemption)
+      });
+    } catch (err) {
+      console.error('Failed to sync redemption with MongoDB:', err);
+    }
+
     setIsRedeemModalOpen(false);
     alert(`Reward redeemed successfully! Voucher Code: ${newRedemption.voucherCode}`);
   };

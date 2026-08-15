@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Users, Plus, Search, Mail, Phone, Award, Target, CheckCircle2, TrendingUp, Edit2, Trash2 } from 'lucide-react';
+import { API_BASE_URL } from '../../config/api';
 
 export default function ExecutivesPage() {
   const [executives, setExecutives] = useState(() => {
@@ -97,6 +98,22 @@ export default function ExecutivesPage() {
     status: 'Active'
   });
 
+  // Initial fetch from backend
+  useEffect(() => {
+    const fetchExecutives = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/executives`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) setExecutives(data);
+        }
+      } catch (err) {
+        console.warn('Fallback to local storage for executives.');
+      }
+    };
+    fetchExecutives();
+  }, []);
+
   React.useEffect(() => {
     localStorage.setItem('nandhi_executives', JSON.stringify(executives));
   }, [executives]);
@@ -114,7 +131,7 @@ export default function ExecutivesPage() {
     });
   }, [executives, searchQuery, deptFilter]);
 
-  const handleAddExecutive = (e) => {
+  const handleAddExecutive = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.phone) {
       alert('Please fill employee name and phone number');
@@ -130,7 +147,23 @@ export default function ExecutivesPage() {
       incentiveEarned: 0
     };
 
-    setExecutives([newEmp, ...executives]);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/executives`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newEmp)
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setExecutives([saved, ...executives]);
+      } else {
+        setExecutives([newEmp, ...executives]);
+      }
+    } catch (err) {
+      console.error('Failed to sync executive with MongoDB:', err);
+      setExecutives([newEmp, ...executives]);
+    }
+
     setIsModalOpen(false);
     setFormData({
       name: '',
@@ -144,8 +177,13 @@ export default function ExecutivesPage() {
     });
   };
 
-  const handleDeleteExecutive = (id) => {
+  const handleDeleteExecutive = async (id) => {
     if (window.confirm('Are you sure you want to remove this employee?')) {
+      try {
+        await fetch(`${API_BASE_URL}/api/executives/${id}`, { method: 'DELETE' });
+      } catch (err) {
+        console.error('Failed to delete executive from MongoDB:', err);
+      }
       setExecutives(prev => prev.filter(e => e.id !== id));
     }
   };

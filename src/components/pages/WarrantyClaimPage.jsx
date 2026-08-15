@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ShieldCheck, Plus, Search, Filter, Printer, CheckCircle, Clock, XCircle, AlertTriangle, FileText, Check, ChevronDown } from 'lucide-react';
 import PrintPreviewModal from '../PrintPreviewModal';
+import { API_BASE_URL } from '../../config/api';
 
 export default function WarrantyClaimPage({
   customers = [],
@@ -131,6 +132,22 @@ export default function WarrantyClaimPage({
     setShowCustomerDropdown(false);
   };
 
+  // Initial fetch from backend
+  useEffect(() => {
+    const fetchClaims = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/warranties`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) setClaims(data);
+        }
+      } catch (err) {
+        console.warn('Fallback to local storage for warranty claims.');
+      }
+    };
+    fetchClaims();
+  }, []);
+
   // Sync to localstorage
   React.useEffect(() => {
     localStorage.setItem('nandhi_warranty_claims', JSON.stringify(claims));
@@ -166,7 +183,7 @@ export default function WarrantyClaimPage({
     });
   }, [claims, searchQuery, statusFilter]);
 
-  const handleCreateClaim = (e) => {
+  const handleCreateClaim = async (e) => {
     e.preventDefault();
     if (!formData.customerName || !formData.vehicleRegNo || !formData.defectivePart) {
       alert('Please fill in Customer Name, Vehicle Reg No, and Defective Part.');
@@ -182,7 +199,23 @@ export default function WarrantyClaimPage({
       settlementDate: ''
     };
 
-    setClaims([newClaim, ...claims]);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/warranties`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newClaim)
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setClaims([saved, ...claims]);
+      } else {
+        setClaims([newClaim, ...claims]);
+      }
+    } catch (err) {
+      console.error('Failed to sync claim with MongoDB:', err);
+      setClaims([newClaim, ...claims]);
+    }
+
     setIsModalOpen(false);
     setFormData({
       customerName: '',
@@ -203,17 +236,33 @@ export default function WarrantyClaimPage({
     });
   };
 
-  const handleUpdateStatus = (id, newStatus) => {
-    setClaims(prev => prev.map(c => {
+  const handleUpdateStatus = async (id, newStatus) => {
+    let updatedClaim = null;
+    const nextClaims = claims.map(c => {
       if (c.id === id) {
-        return {
+        updatedClaim = {
           ...c,
           status: newStatus,
           settlementDate: (newStatus === 'Approved' || newStatus === 'Settled') ? new Date().toISOString().split('T')[0] : c.settlementDate
         };
+        return updatedClaim;
       }
       return c;
-    }));
+    });
+
+    setClaims(nextClaims);
+
+    if (updatedClaim) {
+      try {
+        await fetch(`${API_BASE_URL}/api/warranties`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedClaim)
+        });
+      } catch (err) {
+        console.error('Failed to sync claim update with MongoDB:', err);
+      }
+    }
   };
 
   const printClaim = (claim) => {

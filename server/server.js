@@ -21,6 +21,13 @@ import CompanyProfile from './models/CompanyProfile.js';
 import LoyaltyBalance from './models/LoyaltyBalance.js';
 import Redemption from './models/Redemption.js';
 
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 dotenv.config();
 
 const app = express();
@@ -33,7 +40,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Database Connection
 mongoose
-  .connect(process.env.MONGODB_URI)
+  .connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
   .then(async () => {
     console.log('Connected to MongoDB Atlas successfully.');
     await seedDatabase();
@@ -235,6 +242,19 @@ app.post('/api/leads', async (req, res) => {
     const data = { ...req.body, id };
     const saved = await Lead.findOneAndUpdate({ id }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/leads/:id', async (req, res) => {
+  try {
+    const saved = await Lead.findOneAndUpdate(
+      { id: req.params.id },
+      { $set: req.body },
+      { new: true }
+    );
+    res.json(saved);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

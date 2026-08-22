@@ -353,47 +353,82 @@ export default function App() {
     }
   };
 
-  const syncLeadsWithDatabase = async (prev, updated) => {
-    if (updated.length > prev.length) {
-      // Add Lead
-      const newLead = updated[0];
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/leads`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newLead)
+  // Add or Update a Lead in backend database
+  const addLead = async (leadPayload) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leadPayload)
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setLeads(prev => {
+          const idx = prev.findIndex(l => l.id === saved.id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = saved;
+            return next;
+          }
+          return [saved, ...prev];
         });
-        if (res.ok) {
-          const saved = await res.json();
-          setLeads(current => current.map(item => item.id === newLead.id ? saved : item));
-        }
-      } catch (e) {
-        console.error('Failed to sync added lead with MongoDB:', e);
+        return saved;
       }
-    } else if (updated.length < prev.length) {
-      // Delete Lead
-      const deleted = prev.find(pl => !updated.some(ul => ul.id === pl.id));
-      if (deleted) {
-        try {
-          await fetch(`${API_BASE_URL}/api/leads/${deleted.id}`, {
-            method: 'DELETE'
-          });
-        } catch (e) {
-          console.error('Failed to sync deleted lead with MongoDB:', e);
-        }
-      }
+    } catch (err) {
+      console.error('Failed to save lead to MongoDB:', err);
     }
+    // Fallback local state
+    setLeads(prev => {
+      const idx = prev.findIndex(l => l.id === leadPayload.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = leadPayload;
+        return next;
+      }
+      return [leadPayload, ...prev];
+    });
+    return leadPayload;
+  };
+
+  // Update an existing Lead in backend database
+  const updateLead = async (id, updatedFields) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/leads/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedFields)
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setLeads(prev => prev.map(l => (l.id === id ? { ...l, ...saved } : l)));
+        return saved;
+      }
+    } catch (err) {
+      console.error('Failed to update lead in MongoDB:', err);
+    }
+    setLeads(prev => prev.map(l => (l.id === id ? { ...l, ...updatedFields } : l)));
+    return updatedFields;
+  };
+
+  // Delete a Lead from backend database
+  const deleteLead = async (leadId) => {
+    try {
+      await fetch(`${API_BASE_URL}/api/leads/${leadId}`, {
+        method: 'DELETE'
+      });
+    } catch (err) {
+      console.error('Failed to delete lead from MongoDB:', err);
+    }
+    setLeads(prev => prev.filter(l => l.id !== leadId));
   };
 
   const handleSetLeads = async (action) => {
     if (typeof action === 'function') {
       setLeads(prev => {
         const updated = action(prev);
-        syncLeadsWithDatabase(prev, updated);
         return updated;
       });
     } else {
-      syncLeadsWithDatabase(leads, action);
       setLeads(action);
     }
   };
@@ -945,6 +980,9 @@ export default function App() {
               setActiveSubTab={setActiveSubTab}
               leads={leads}
               setLeads={handleSetLeads}
+              addLead={addLead}
+              updateLead={updateLead}
+              deleteLead={deleteLead}
               addCustomer={addCustomer}
               vehicles={vehicles}
               showPreviews={showPreviews}

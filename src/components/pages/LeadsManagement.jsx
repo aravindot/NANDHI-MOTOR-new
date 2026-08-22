@@ -9,6 +9,9 @@ export default function LeadsManagement({
   setActiveSubTab,
   leads = [],
   setLeads,
+  addLead,
+  updateLead,
+  deleteLead,
   addCustomer,
   vehicles = [],
   showPreviews = true,
@@ -76,10 +79,12 @@ export default function LeadsManagement({
     return Array.from(colorSet);
   }, [vehicles]);
 
-
   const executiveList = ['Kishore Kumar', 'Shiva Ram', 'Ankita Sen', 'K. Kumar'];
 
-  // Leads list state is passed as a prop from App.jsx
+  const [editingLead, setEditingLead] = useState(null);
+  const [leadSuccessMsg, setLeadSuccessMsg] = useState('');
+  const [leadStatusFilter, setLeadStatusFilter] = useState('ALL');
+  const [leadTempFilter, setLeadTempFilter] = useState('ALL');
 
   // Sale Lead Form State (initialized with first vehicle in list)
   const [leadFormData, setLeadFormData] = useState({
@@ -90,9 +95,9 @@ export default function LeadsManagement({
     address: '',
     sourceType: 'Walk-In',
     executive: executiveList[0],
-    vehicleModel: vehicleList[0].name,
-    vehicleColor: allVehicleColors[0],
-    price: vehicleList[0].basePrice,
+    vehicleModel: (vehicleList && vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G',
+    vehicleColor: (allVehicleColors && allVehicleColors[0]) || 'Blue',
+    price: (vehicleList && vehicleList[0] && vehicleList[0].basePrice) || 82000,
     leadType: 'Hot',
     status: 'Entered',
     followupDate: '',
@@ -598,65 +603,16 @@ export default function LeadsManagement({
 
   // Handle vehicle model change in Lead Form to update colors and price
   const handleLeadVehicleChange = (modelName) => {
-    const selectedVeh = vehicleList.find(v => v.name === modelName) || vehicleList[0];
+    const selectedVeh = (vehicleList && vehicleList.find(v => v.name === modelName)) || vehicleList[0] || { name: modelName, basePrice: 82000 };
     setLeadFormData(prev => ({
       ...prev,
       vehicleModel: modelName,
-      price: selectedVeh.basePrice
+      price: selectedVeh.basePrice || prev.price
     }));
   };
 
-  // Submit Sale Lead
-  const handleLeadFormSubmit = (e) => {
-    e.preventDefault();
-    const newLeadId = `L-${String(leads.length + 1).padStart(2, '0')}`;
-    const newLeadItem = {
-      id: newLeadId,
-      name: leadFormData.name,
-      mobile: leadFormData.mobile,
-      email: leadFormData.email,
-      aadhar: leadFormData.aadhar,
-      address: leadFormData.address || 'N/A',
-      sourceType: leadFormData.sourceType,
-      executive: leadFormData.executive,
-      vehicle: leadFormData.vehicleModel,
-      color: leadFormData.vehicleColor,
-      price: leadFormData.price ? Number(leadFormData.price) : 0,
-      leadType: leadFormData.leadType,
-      status: leadFormData.status,
-      followupDate: leadFormData.followupDate,
-      note: leadFormData.note
-    };
-
-    // Save lead to state
-    setLeads([newLeadItem, ...leads]);
-
-    // Auto-save customer details to the Customers directory
-    if (addCustomer) {
-      addCustomer(leadFormData);
-    }
-
-    // Pre-populate the Quotation form with this saved lead's data!
-    setQuoteFormData({
-      customerName: leadFormData.name,
-      customerPhone: leadFormData.mobile,
-      vehicleModel: leadFormData.vehicleModel,
-      vehicleColor: leadFormData.vehicleColor || '',
-      exShowroom: leadFormData.price ? Number(leadFormData.price) : '',
-      rto: '',
-      insurance: '',
-      accessories: '',
-      handling: '',
-      discount: ''
-    });
-
-    // Clear generated quote preview so it computes fresh
-    setGeneratedQuote(null);
-
-    // Alert user and automatically transition to the quotation subtab!
-    alert(`Sale Lead successfully created! Auto-redirecting to the Quotation page to compute the On-Road price for ${leadFormData.name}.`);
-    
-    // Clear Lead Form fields
+  const handleOpenAddLead = () => {
+    setEditingLead(null);
     setLeadFormData({
       name: '',
       mobile: '',
@@ -664,17 +620,183 @@ export default function LeadsManagement({
       aadhar: '',
       address: '',
       sourceType: 'Walk-In',
-      executive: executiveList[0],
-      vehicleModel: vehicleList[0].name,
-      vehicleColor: vehicleList[0].colors[0],
-      price: vehicleList[0].basePrice,
+      executive: executiveList[0] || 'Kishore Kumar',
+      vehicleModel: (vehicleList && vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G',
+      vehicleColor: (vehicleList && vehicleList[0] && vehicleList[0].colors && vehicleList[0].colors[0]) || (allVehicleColors && allVehicleColors[0]) || 'Blue',
+      price: (vehicleList && vehicleList[0] && vehicleList[0].basePrice) || 82000,
+      leadType: 'Hot',
+      status: 'Entered',
+      followupDate: '',
+      note: ''
+    });
+    setActiveFormTab('lead');
+  };
+
+  const handleOpenEditLead = (lead) => {
+    setEditingLead(lead);
+    setLeadFormData({
+      name: lead.name || '',
+      mobile: lead.mobile || '',
+      email: lead.email || '',
+      aadhar: lead.aadhar || '',
+      address: lead.address || '',
+      sourceType: lead.sourceType || 'Walk-In',
+      executive: lead.executive || executiveList[0],
+      vehicleModel: lead.vehicle || (vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G',
+      vehicleColor: lead.color || (allVehicleColors && allVehicleColors[0]) || 'Blue',
+      price: lead.price || 82000,
+      leadType: lead.leadType || 'Hot',
+      status: lead.status || 'Entered',
+      followupDate: lead.followupDate || '',
+      note: lead.note || ''
+    });
+    setActiveFormTab('lead');
+  };
+
+  // Submit Sale Lead (Create or Edit)
+  const handleLeadFormSubmit = async (e) => {
+    e.preventDefault();
+
+    if (editingLead) {
+      const updatedItem = {
+        ...editingLead,
+        name: leadFormData.name,
+        mobile: leadFormData.mobile,
+        email: leadFormData.email,
+        aadhar: leadFormData.aadhar,
+        address: leadFormData.address || 'N/A',
+        sourceType: leadFormData.sourceType,
+        executive: leadFormData.executive,
+        vehicle: leadFormData.vehicleModel,
+        color: leadFormData.vehicleColor,
+        price: leadFormData.price ? Number(leadFormData.price) : 0,
+        leadType: leadFormData.leadType,
+        status: leadFormData.status,
+        followupDate: leadFormData.followupDate,
+        note: leadFormData.note
+      };
+
+      if (updateLead) {
+        await updateLead(editingLead.id, updatedItem);
+      } else if (setLeads) {
+        setLeads(prev => prev.map(l => (l.id === editingLead.id ? updatedItem : l)));
+      }
+      setEditingLead(null);
+      setLeadSuccessMsg(`Lead ${editingLead.id} updated successfully!`);
+      setTimeout(() => setLeadSuccessMsg(''), 4000);
+    } else {
+      // Robust unique ID generation
+      const nextNum = leads.reduce((max, l) => {
+        const n = parseInt((l.id || '').replace(/\D/g, ''), 10);
+        return !isNaN(n) && n > max ? n : max;
+      }, 0) + 1;
+      const newLeadId = `L-${String(nextNum).padStart(2, '0')}`;
+
+      const newLeadItem = {
+        id: newLeadId,
+        name: leadFormData.name,
+        mobile: leadFormData.mobile,
+        email: leadFormData.email,
+        aadhar: leadFormData.aadhar,
+        address: leadFormData.address || 'N/A',
+        sourceType: leadFormData.sourceType,
+        executive: leadFormData.executive,
+        vehicle: leadFormData.vehicleModel,
+        color: leadFormData.vehicleColor,
+        price: leadFormData.price ? Number(leadFormData.price) : 0,
+        leadType: leadFormData.leadType,
+        status: leadFormData.status || 'Entered',
+        followupDate: leadFormData.followupDate,
+        note: leadFormData.note,
+        createdOn: new Date().toLocaleDateString('en-IN')
+      };
+
+      if (addLead) {
+        await addLead(newLeadItem);
+      } else if (setLeads) {
+        setLeads([newLeadItem, ...leads]);
+      }
+
+      // Auto-save customer details
+      if (addCustomer) {
+        addCustomer(newLeadItem);
+      }
+
+      // Pre-fill quotation state
+      setQuoteFormData({
+        customerName: leadFormData.name,
+        customerPhone: leadFormData.mobile,
+        vehicleModel: leadFormData.vehicleModel,
+        vehicleColor: leadFormData.vehicleColor || '',
+        exShowroom: leadFormData.price ? Number(leadFormData.price) : '',
+        rto: '',
+        insurance: '',
+        accessories: '',
+        handling: '',
+        discount: ''
+      });
+
+      setLeadSuccessMsg(`New Sale Lead #${newLeadId} added successfully for ${newLeadItem.name}!`);
+      setTimeout(() => setLeadSuccessMsg(''), 4000);
+    }
+
+    // Reset Lead Form fields
+    setLeadFormData({
+      name: '',
+      mobile: '',
+      email: '',
+      aadhar: '',
+      address: '',
+      sourceType: 'Walk-In',
+      executive: executiveList[0] || 'Kishore Kumar',
+      vehicleModel: (vehicleList && vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G',
+      vehicleColor: (vehicleList && vehicleList[0] && vehicleList[0].colors && vehicleList[0].colors[0]) || (allVehicleColors && allVehicleColors[0]) || 'Blue',
+      price: (vehicleList && vehicleList[0] && vehicleList[0].basePrice) || 82000,
       leadType: 'Hot',
       status: 'Entered',
       followupDate: '',
       note: ''
     });
 
+    setActiveFormTab(null);
+  };
+
+  const handleQuickStatusChange = async (lead, newStatus) => {
+    const updated = { ...lead, status: newStatus };
+    if (updateLead) {
+      await updateLead(lead.id, updated);
+    } else if (setLeads) {
+      setLeads(prev => prev.map(l => (l.id === lead.id ? updated : l)));
+    }
+  };
+
+  const handleConvertToQuotation = (lead) => {
+    setQuoteFormData({
+      customerName: lead.name || '',
+      customerPhone: lead.mobile || '',
+      vehicleModel: lead.vehicle || (vehicleList[0] && vehicleList[0].name) || '',
+      vehicleColor: lead.color || '',
+      exShowroom: lead.price ? Number(lead.price) : '',
+      rto: '',
+      insurance: '',
+      accessories: '',
+      handling: '',
+      discount: ''
+    });
+    setGeneratedQuote(null);
+    setEditingQuoteId(null);
     setActiveSubTab('quotation');
+    setActiveFormTab('quote');
+  };
+
+  const handleDeleteLeadAction = async (id) => {
+    if (confirm(`Are you sure you want to delete lead ${id}?`)) {
+      if (deleteLead) {
+        await deleteLead(id);
+      } else if (setLeads) {
+        setLeads(leads.filter(l => l.id !== id));
+      }
+    }
   };
 
   // Compute Total On-Road Price
@@ -708,16 +830,13 @@ export default function LeadsManagement({
     setEditingQuoteId(null);
   };
 
-  const handleDeleteLead = (id) => {
-    if (confirm('Are you sure you want to delete this lead?')) {
-      setLeads(leads.filter(l => l.id !== id));
-    }
-  };
-
-  const filteredLeads = leads.filter(l =>
-    l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    l.mobile.includes(searchQuery)
-  );
+  const filteredLeads = leads.filter(l => {
+    const q = searchQuery.toLowerCase().trim();
+    const matchQuery = !q || (l.name || '').toLowerCase().includes(q) || (l.mobile || '').includes(q) || (l.id || '').toLowerCase().includes(q);
+    const matchStatus = leadStatusFilter === 'ALL' || l.status === leadStatusFilter;
+    const matchTemp = leadTempFilter === 'ALL' || l.leadType === leadTempFilter;
+    return matchQuery && matchStatus && matchTemp;
+  });
 
 
   return (
@@ -738,20 +857,40 @@ export default function LeadsManagement({
         </span>
       </div>
 
+      {/* Success Alert Banner */}
+      {leadSuccessMsg && (
+        <div style={{
+          backgroundColor: '#ecfdf5',
+          border: '1px solid #10b981',
+          color: '#065f46',
+          padding: '10px 16px',
+          borderRadius: '8px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '0.9rem',
+          fontWeight: 500
+        }}>
+          <CheckCircle size={16} color="#059669" />
+          <span>{leadSuccessMsg}</span>
+        </div>
+      )}
+
       {/* SUBTAB 1: SALE LEAD */}
       {activeSubTab === 'sale-lead' && (
         <div style={{ animation: 'fadeIn 0.2s ease' }}>
           {/* Leads List Side */}
           <div className="card">
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <h3 className="card-title">Submitted Sale Leads Ledger</h3>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <div className="quick-search">
                   <Search size={14} className="quick-search-icon" />
                   <input
                     type="text"
-                    placeholder="Search name/phone..."
-                    style={{ width: '160px', padding: '6px 10px 6px 30px', fontSize: '0.8rem' }}
+                    placeholder="Search name/phone/ID..."
+                    style={{ width: '180px', padding: '6px 10px 6px 30px', fontSize: '0.8rem' }}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -759,38 +898,71 @@ export default function LeadsManagement({
                 <button
                   type="button"
                   className="btn btn-primary btn-sm"
-                  onClick={() => setActiveFormTab('lead')}
+                  onClick={handleOpenAddLead}
                 >
-                  + Add Sale Lead
+                  <UserPlus size={14} /> + Add Sale Lead
                 </button>
               </div>
             </div>
-            <div className="card-body" style={{ padding: 0, maxHeight: '720px', overflowY: 'auto' }}>
-              {/* Leads History Stats Summary */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '10px',
-                padding: '16px 20px',
-                backgroundColor: '#f9fafb',
-                borderBottom: '1px solid #e5e7eb'
-              }}>
-                <div style={{ backgroundColor: '#ffffff', padding: '10px', borderRadius: '6px', border: '1px solid #e5e7eb', textAlign: 'center' }}>
-                  <span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Total Leads</span>
-                  <strong style={{ fontSize: '1.2rem', color: '#1f2937' }}>{leadsSummaryStats.total}</strong>
+
+            {/* Filter & Metric Bar */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '10px',
+              padding: '12px 20px',
+              backgroundColor: '#f9fafb',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              {/* Metric stats */}
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ backgroundColor: '#ffffff', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.8rem' }}>
+                  <span style={{ color: '#6b7280' }}>Total: </span>
+                  <strong style={{ color: '#1f2937' }}>{leadsSummaryStats.total}</strong>
                 </div>
-                <div style={{ backgroundColor: '#ffffff', padding: '10px', borderRadius: '6px', border: '1px solid #e5e7eb', textAlign: 'center' }}>
-                  <span style={{ display: 'block', fontSize: '0.72rem', color: '#ef4444', textTransform: 'uppercase', fontWeight: 600 }}>🔥 Hot Leads</span>
-                  <strong style={{ fontSize: '1.2rem', color: '#ef4444' }}>{leadsSummaryStats.hot}</strong>
+                <div style={{ backgroundColor: '#ffffff', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.8rem' }}>
+                  <span style={{ color: '#ef4444' }}>🔥 Hot: </span>
+                  <strong style={{ color: '#ef4444' }}>{leadsSummaryStats.hot}</strong>
                 </div>
-                <div style={{ backgroundColor: '#ffffff', padding: '10px', borderRadius: '6px', border: '1px solid #e5e7eb', textAlign: 'center' }}>
-                  <span style={{ display: 'block', fontSize: '0.72rem', color: '#059669', textTransform: 'uppercase', fontWeight: 600 }}>Walk-In / Digital</span>
-                  <strong style={{ fontSize: '0.85rem', color: '#1f2937', display: 'block', marginTop: '4px' }}>
-                    {leadsSummaryStats.walkIn} W / {leadsSummaryStats.digital} D
-                  </strong>
+                <div style={{ backgroundColor: '#ffffff', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.8rem' }}>
+                  <span style={{ color: '#059669' }}>Walk-in: </span>
+                  <strong style={{ color: '#059669' }}>{leadsSummaryStats.walkIn}</strong>
+                </div>
+                <div style={{ backgroundColor: '#ffffff', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.8rem' }}>
+                  <span style={{ color: '#2563eb' }}>Digital: </span>
+                  <strong style={{ color: '#2563eb' }}>{leadsSummaryStats.digital}</strong>
                 </div>
               </div>
 
+              {/* Status Filter Chips */}
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 600 }}>Filter:</span>
+                {['ALL', 'Entered', 'Follow-up', 'Convert'].map(st => (
+                  <button
+                    key={st}
+                    type="button"
+                    style={{
+                      padding: '3px 8px',
+                      fontSize: '0.72rem',
+                      borderRadius: '4px',
+                      border: '1px solid',
+                      borderColor: leadStatusFilter === st ? '#059669' : '#d1d5db',
+                      backgroundColor: leadStatusFilter === st ? '#ecfdf5' : '#ffffff',
+                      color: leadStatusFilter === st ? '#059669' : '#4b5563',
+                      cursor: 'pointer',
+                      fontWeight: leadStatusFilter === st ? 600 : 400
+                    }}
+                    onClick={() => setLeadStatusFilter(st)}
+                  >
+                    {st === 'ALL' ? 'All Statuses' : st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="card-body" style={{ padding: 0, maxHeight: '720px', overflowY: 'auto' }}>
               {filteredLeads.length > 0 ? (
                 filteredLeads.map((lead) => (
                   <div
@@ -800,67 +972,125 @@ export default function LeadsManagement({
                       padding: '16px 20px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '8px',
+                      gap: '10px',
                       backgroundColor: lead.leadType === 'Hot' ? '#fffaf8' : '#ffffff',
                       position: 'relative'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: '4px' }}>
-                        {lead.id}
-                      </span>
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
+                          {lead.id}
+                        </span>
                         <span className={`badge ${lead.leadType === 'Hot' ? 'badge-danger' : 'badge-info'}`}>
-                          {lead.leadType}
+                          {lead.leadType === 'Hot' ? '🔥 Hot' : lead.leadType}
                         </span>
-                        <span className="badge badge-success" style={{
-                          backgroundColor: lead.status === 'Convert' ? '#ecfdf5' : lead.status === 'Follow-up' ? '#fffbeb' : '#f3f4f6',
-                          color: lead.status === 'Convert' ? '#047857' : lead.status === 'Follow-up' ? '#b45309' : '#4b5563'
-                        }}>
-                          {lead.status}
-                        </span>
-                        <button
+                        {/* Status dropdown quick toggle */}
+                        <select
+                          value={lead.status || 'Entered'}
+                          onChange={(e) => handleQuickStatusChange(lead, e.target.value)}
+                          style={{
+                            fontSize: '0.75rem',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            border: '1px solid #d1d5db',
+                            backgroundColor: lead.status === 'Convert' ? '#ecfdf5' : lead.status === 'Follow-up' ? '#fffbeb' : '#f3f4f6',
+                            color: lead.status === 'Convert' ? '#047857' : lead.status === 'Follow-up' ? '#b45309' : '#374151',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="Entered">Entered</option>
+                          <option value="Follow-up">In Follow-up</option>
+                          <option value="Convert">Converted</option>
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        {/* WhatsApp Action */}
+                        <a
+                          href={`https://wa.me/91${lead.mobile}?text=${encodeURIComponent(`Hello ${lead.name}, greetings from Nandhi Motors regarding your inquiry for ${lead.vehicle || 'two-wheeler'}.`)}`}
+                          target="_blank"
+                          rel="noreferrer"
                           className="btn btn-secondary btn-sm"
-                          style={{ padding: '2px 6px', color: '#ef4444', borderColor: 'transparent' }}
-                          onClick={() => handleDeleteLead(lead.id)}
+                          style={{ padding: '4px 8px', color: '#16a34a', borderColor: '#bbf7d0', backgroundColor: '#f0fdf4', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}
+                          title="WhatsApp Customer"
+                        >
+                          <MessageCircle size={13} /> WhatsApp
+                        </a>
+
+                        {/* Convert to Quotation Action */}
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '4px 8px', color: '#059669', borderColor: '#a7f3d0', backgroundColor: '#ecfdf5', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}
+                          onClick={() => handleConvertToQuotation(lead)}
+                          title="Generate Quotation for this Lead"
+                        >
+                          <Calculator size={13} /> Create Quote
+                        </button>
+
+                        {/* Edit Lead Button */}
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '4px 8px', color: '#2563eb', borderColor: '#bfdbfe', backgroundColor: '#eff6ff' }}
+                          onClick={() => handleOpenEditLead(lead)}
+                          title="Edit Lead Details"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+
+                        {/* Delete Lead Button */}
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#fca5a5' }}
+                          onClick={() => handleDeleteLeadAction(lead.id)}
                           title="Delete Lead"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={13} />
                         </button>
                       </div>
                     </div>
 
                     <div>
-                      <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#1f2937' }}>{lead.name}</h4>
-                      <p style={{ fontSize: '0.8rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                        <Phone size={12} /> {lead.mobile} {lead.email ? ` | ${lead.email}` : ''}
+                      <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#1f2937', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {lead.name}
+                        <span style={{ fontSize: '0.75rem', fontWeight: 400, color: '#6b7280' }}>
+                          (Registered: {lead.createdOn || 'Recent'})
+                        </span>
+                      </h4>
+                      <p style={{ fontSize: '0.8rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                        <Phone size={12} /> <a href={`tel:${lead.mobile}`} style={{ color: '#1f2937', textDecoration: 'none', fontWeight: 500 }}>{lead.mobile}</a>
+                        {lead.email ? ` | ✉️ ${lead.email}` : ''}
                       </p>
                       <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '2px' }}>
-                        <strong>Aadhar:</strong> {lead.aadhar || 'Not Provided'} | <strong>Source:</strong> {lead.sourceType}
+                        <strong>Aadhar:</strong> {lead.aadhar || 'Not Provided'} | <strong>Source:</strong> {lead.sourceType || 'Walk-In'} {lead.address && lead.address !== 'N/A' ? `| 📍 ${lead.address}` : ''}
                       </p>
                     </div>
 
                     <div style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
                         <span style={{ color: '#6b7280' }}>Vehicle Choice:</span>
-                        <strong>{lead.vehicle} ({lead.color})</strong>
+                        <strong>{lead.vehicle} {lead.color ? `(${lead.color})` : ''}</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                        <span style={{ color: '#6b7280' }}>Ex-Showroom Price:</span>
-                        <strong>₹{lead.price.toLocaleString('en-IN')}</strong>
+                        <span style={{ color: '#6b7280' }}>Ex-Showroom Base:</span>
+                        <strong style={{ color: '#059669' }}>₹{Number(lead.price || 0).toLocaleString('en-IN')}</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#6b7280' }}>Executive Assigned:</span>
-                        <strong>{lead.executive}</strong>
+                        <span style={{ color: '#6b7280' }}>Assigned Executive:</span>
+                        <strong>{lead.executive || 'Unassigned'}</strong>
                       </div>
                     </div>
 
                     {lead.followupDate && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#047857', fontWeight: 600 }}>
-                        <Calendar size={12} /> Followup: {lead.followupDate}
+                        <Calendar size={12} /> Follow-up Scheduled: {lead.followupDate}
                       </div>
                     )}
-                    
+
                     {lead.note && (
                       <p style={{ fontSize: '0.75rem', color: '#6b7280', backgroundColor: '#f3f4f6', padding: '6px 10px', borderRadius: '4px' }}>
                         <strong>Note:</strong> {lead.note}
@@ -869,9 +1099,17 @@ export default function LeadsManagement({
                   </div>
                 ))
               ) : (
-                <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>
+                <div style={{ padding: '50px 20px', textAlign: 'center', color: '#9ca3af' }}>
                   <Clipboard size={48} strokeWidth={1} style={{ marginBottom: '12px' }} />
-                  <p>No leads found matching query.</p>
+                  <p style={{ fontSize: '0.9rem', fontWeight: 500, color: '#6b7280' }}>No leads found matching current filter or search.</p>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    style={{ marginTop: '12px' }}
+                    onClick={handleOpenAddLead}
+                  >
+                    + Create First Lead
+                  </button>
                 </div>
               )}
             </div>
@@ -2111,18 +2349,18 @@ export default function LeadsManagement({
           }} onClick={(e) => e.stopPropagation()}>
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 className="card-title">
-                <UserPlus size={18} style={{ color: '#059669' }} /> New Sale Lead Entry
+                <UserPlus size={18} style={{ color: '#059669' }} /> {editingLead ? `Edit Sale Lead (${editingLead.id})` : 'New Sale Lead Entry'}
               </h3>
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
-                onClick={() => setActiveFormTab(null)}
+                onClick={() => { setActiveFormTab(null); setEditingLead(null); }}
                 style={{ padding: '4px 10px', minWidth: 'auto' }}
               >
                 ✕ Close
               </button>
             </div>
-            <form className="card-body" onSubmit={(e) => { handleLeadFormSubmit(e); setActiveFormTab(null); }}>
+            <form className="card-body" onSubmit={handleLeadFormSubmit}>
               {/* SECTION A: CUSTOMER DETAILS */}
               <div style={{ marginBottom: '24px', borderBottom: '1px solid #f3f4f6', paddingBottom: '16px' }}>
                 <h4 style={{ fontSize: '0.85rem', color: '#059669', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px', fontWeight: 700 }}>
@@ -2330,7 +2568,7 @@ export default function LeadsManagement({
               </div>
 
               <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '1rem', fontWeight: 600 }}>
-                SUBMIT SALE LEAD
+                {editingLead ? 'UPDATE SALE LEAD' : 'SUBMIT SALE LEAD'}
               </button>
             </form>
           </div>

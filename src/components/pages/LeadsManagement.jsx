@@ -118,7 +118,11 @@ export default function LeadsManagement({
     discount: ''
   });
 
-  const [generatedQuote, setGeneratedQuote] = useState(null);
+  const [quoteSuccessMsg, setQuoteSuccessMsg] = useState('');
+  const [invoiceSuccessMsg, setInvoiceSuccessMsg] = useState('');
+  const [bookingSuccessMsg, setBookingSuccessMsg] = useState('');
+
+  const [generatedQuote, setGeneratedQuote] = useState(() => (quotations && quotations.length > 0 ? quotations[0] : null));
   const [editingQuoteId, setEditingQuoteId] = useState(null);
   const [editingInvoiceId, setEditingInvoiceId] = useState(null);
   const [isMonthlyReportOpen, setIsMonthlyReportOpen] = useState(false);
@@ -163,7 +167,7 @@ export default function LeadsManagement({
   const [bookings, setBookings] = useState(() => {
     const saved = localStorage.getItem('nandhi_bookings');
     return saved ? JSON.parse(saved) : [
-      { id: 'BK-01', customerName: 'Rajesh Kumar', mobile: '9842155670', vehicleModel: vehicleList[0].name, vehicleColor: allVehicleColors[0], bookingDate: '2026-08-14', deliveryDate: '2026-08-20', bookingAmount: 5000, paymentMode: 'UPI', createdOn: '14/08/2026' }
+      { id: 'BK-01', customerName: 'Rajesh Kumar', mobile: '9842155670', vehicleModel: (vehicleList && vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G', vehicleColor: (allVehicleColors && allVehicleColors[0]) || 'Blue', bookingDate: '2026-08-14', deliveryDate: '2026-08-20', bookingAmount: 5000, paymentMode: 'UPI', createdOn: '14/08/2026' }
     ];
   });
 
@@ -174,15 +178,15 @@ export default function LeadsManagement({
   const [bookingForm, setBookingForm] = useState({
     customerName: '',
     mobile: '',
-    vehicleModel: vehicleList[0].name,
-    vehicleColor: allVehicleColors[0],
+    vehicleModel: (vehicleList && vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G',
+    vehicleColor: (allVehicleColors && allVehicleColors[0]) || 'Blue',
     bookingDate: '',
     deliveryDate: '',
     bookingAmount: '',
     paymentMode: 'Cash',
     notes: ''
   });
-  const [generatedBooking, setGeneratedBooking] = useState(null);
+  const [generatedBooking, setGeneratedBooking] = useState(() => (bookings && bookings.length > 0 ? bookings[0] : null));
 
   // Invoice Form State
   const [invoiceFormData, setInvoiceFormData] = useState({
@@ -194,7 +198,7 @@ export default function LeadsManagement({
     customerAadhar: '',
     customerGst: '',
     vehicleModel: vehicleList[0] ? vehicleList[0].name : '',
-    vehicleColor: allVehicleColors[0],
+    vehicleColor: allVehicleColors[0] || 'Blue',
     vinNumber: '',
     batteryNumber: '',
     chargerNumber: '',
@@ -208,7 +212,26 @@ export default function LeadsManagement({
     discount: '0',
     paymentStatus: 'Fully Paid'
   });
-  const [generatedInvoice, setGeneratedInvoice] = useState(null);
+  const [generatedInvoice, setGeneratedInvoice] = useState(() => (invoices && invoices.length > 0 ? invoices[0] : null));
+
+  // Sync previews if list updates and nothing was loaded
+  useEffect(() => {
+    if (!generatedQuote && quotations && quotations.length > 0) {
+      setGeneratedQuote(quotations[0]);
+    }
+  }, [quotations, generatedQuote]);
+
+  useEffect(() => {
+    if (!generatedInvoice && invoices && invoices.length > 0) {
+      setGeneratedInvoice(invoices[0]);
+    }
+  }, [invoices, generatedInvoice]);
+
+  useEffect(() => {
+    if (!generatedBooking && bookings && bookings.length > 0) {
+      setGeneratedBooking(bookings[0]);
+    }
+  }, [bookings, generatedBooking]);
 
   // Analytics Metrics summaries
   const leadsSummaryStats = React.useMemo(() => {
@@ -434,9 +457,21 @@ export default function LeadsManagement({
   const handleInvoiceSubmit = async (e) => {
     e.preventDefault();
     const details = calculateInvoiceTotalDetails();
+    const nextInvNum = invoices.reduce((max, inv) => {
+      const n = parseInt((inv.invoiceNo || '').replace(/\D/g, ''), 10);
+      return !isNaN(n) && n > max ? n : max;
+    }, 0) + 1;
+    const invoiceNo = editingInvoiceId || invoiceFormData.invoiceNo || String(nextInvNum).padStart(2, '0');
     const invoicePayload = {
       ...invoiceFormData,
-      invoiceNo: editingInvoiceId || invoiceFormData.invoiceNo,
+      invoiceNo,
+      vinNumber: (invoiceFormData.vinNumber || '').toUpperCase(),
+      batteryNumber: (invoiceFormData.batteryNumber || '').toUpperCase(),
+      chargerNumber: (invoiceFormData.chargerNumber || '').toUpperCase(),
+      controllerNumber: (invoiceFormData.controllerNumber || '').toUpperCase(),
+      customerGst: (invoiceFormData.customerGst || '').toUpperCase(),
+      invoiceDate: invoiceFormData.invoiceDate || new Date().toISOString().split('T')[0],
+      createdOn: invoiceFormData.createdOn || new Date().toLocaleDateString('en-IN'),
       exShowroom: Number(invoiceFormData.exShowroom || 0),
       gstRate: Number(invoiceFormData.gstRate || 0),
       insurance: Number(invoiceFormData.insurance || 0),
@@ -453,6 +488,35 @@ export default function LeadsManagement({
     const saved = await addInvoice(invoicePayload);
     setGeneratedInvoice(saved || invoicePayload);
     setEditingInvoiceId(null);
+    setActiveFormTab(null);
+    setInvoiceSuccessMsg(`Tax Invoice #${invoiceNo} saved successfully!`);
+    setTimeout(() => setInvoiceSuccessMsg(''), 4000);
+  };
+
+  // Convert Quotation directly into a Tax Invoice
+  const handleConvertQuoteToInvoice = (q) => {
+    setInvoiceFormData(prev => ({
+      ...prev,
+      customerName: q.customerName || '',
+      customerPhone: q.customerPhone || '',
+      customerAddress: q.customerAddress || '',
+      customerAadhar: q.customerAadhar || '',
+      customerGst: (q.customerGst || '').toUpperCase(),
+      vehicleModel: q.vehicleModel || (vehicleList[0] && vehicleList[0].name) || '',
+      vehicleColor: q.vehicleColor || (allVehicleColors && allVehicleColors[0]) || '',
+      exShowroom: q.exShowroom ? Number(q.exShowroom) : '',
+      insurance: q.insurance ? Number(q.insurance) : '',
+      rto: q.rto ? Number(q.rto) : '',
+      discount: q.discount ? Number(q.discount) : 0,
+      vinNumber: '',
+      batteryNumber: '',
+      chargerNumber: '',
+      controllerNumber: '',
+      paymentStatus: 'Fully Paid'
+    }));
+    setEditingInvoiceId(null);
+    setActiveSubTab('invoice');
+    setActiveFormTab('invoice');
   };
 
   // Edit Handlers for Quotation and Invoice
@@ -461,8 +525,8 @@ export default function LeadsManagement({
     setQuoteFormData({
       customerName: q.customerName || '',
       customerPhone: q.customerPhone || '',
-      vehicleModel: q.vehicleModel || vehicleList[0].name,
-      vehicleColor: q.vehicleColor || allVehicleColors[0],
+      vehicleModel: q.vehicleModel || (vehicleList[0] && vehicleList[0].name) || '',
+      vehicleColor: q.vehicleColor || (allVehicleColors && allVehicleColors[0]) || '',
       exShowroom: q.exShowroom || '',
       rto: q.rto || '',
       insurance: q.insurance || '',
@@ -482,13 +546,13 @@ export default function LeadsManagement({
       customerPhone: inv.customerPhone || inv.customerMobile || '',
       customerAddress: inv.customerAddress || '',
       customerAadhar: inv.customerAadhar || '',
-      customerGst: inv.customerGst || '',
-      vehicleModel: inv.vehicleModel || vehicleList[0].name,
-      vehicleColor: inv.vehicleColor || allVehicleColors[0],
-      vinNumber: inv.vinNumber || inv.vin || inv.chassisNo || '',
-      batteryNumber: inv.batteryNumber || inv.batteryNo || '',
-      chargerNumber: inv.chargerNumber || inv.chargerNo || '',
-      controllerNumber: inv.controllerNumber || inv.controllerNo || '',
+      customerGst: (inv.customerGst || '').toUpperCase(),
+      vehicleModel: inv.vehicleModel || (vehicleList[0] && vehicleList[0].name) || '',
+      vehicleColor: inv.vehicleColor || (allVehicleColors && allVehicleColors[0]) || '',
+      vinNumber: (inv.vinNumber || inv.vin || inv.chassisNo || '').toUpperCase(),
+      batteryNumber: (inv.batteryNumber || inv.batteryNo || '').toUpperCase(),
+      chargerNumber: (inv.chargerNumber || inv.chargerNo || '').toUpperCase(),
+      controllerNumber: (inv.controllerNumber || inv.controllerNo || '').toUpperCase(),
       warrantyDetails: inv.warrantyDetails || '3 Years or 40,000 KMs for Motor, Controller, Cluster & Battery (Whichever is earlier)',
       exShowroom: inv.exShowroom || '',
       gstRate: inv.gstRate || 5,
@@ -551,11 +615,22 @@ export default function LeadsManagement({
 
   const handleBookingSubmit = async (e) => {
     e.preventDefault();
+    const nextBkNum = bookings.reduce((max, b) => {
+      const n = parseInt((b.id || '').replace(/\D/g, ''), 10);
+      return !isNaN(n) && n > max ? n : max;
+    }, 0) + 1;
+    const id = `BK-${String(nextBkNum).padStart(2, '0')}`;
     const newBooking = {
       ...bookingForm,
-      id: `BK-${String(bookings.length + 1).padStart(2, '0')}`,
+      id,
       createdOn: new Date().toLocaleDateString('en-IN')
     };
+
+    setBookings(prev => [newBooking, ...prev]);
+    setGeneratedBooking(newBooking);
+    setActiveFormTab(null);
+    setBookingSuccessMsg(`Booking #${id} registered for ${newBooking.customerName}!`);
+    setTimeout(() => setBookingSuccessMsg(''), 4000);
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/bookings`, {
@@ -565,16 +640,11 @@ export default function LeadsManagement({
       });
       if (res.ok) {
         const saved = await res.json();
-        setBookings([saved, ...bookings]);
+        setBookings(prev => prev.map(b => b.id === id ? saved : b));
         setGeneratedBooking(saved);
-      } else {
-        setBookings([newBooking, ...bookings]);
-        setGeneratedBooking(newBooking);
       }
     } catch (err) {
       console.error('Failed to save booking to MongoDB:', err);
-      setBookings([newBooking, ...bookings]);
-      setGeneratedBooking(newBooking);
     }
   };
 
@@ -814,9 +884,15 @@ export default function LeadsManagement({
   const handleQuoteSubmit = async (e) => {
     e.preventDefault();
     const details = calculateOnRoadTotal();
+    const nextQuoteNum = quotations.reduce((max, q) => {
+      const n = parseInt((q.quoteId || '').replace(/\D/g, ''), 10);
+      return !isNaN(n) && n > max ? n : max;
+    }, 0) + 1;
+    const quoteId = editingQuoteId || `QT-${String(nextQuoteNum).padStart(2, '0')}`;
     const quotePayload = {
       ...quoteFormData,
-      ...(editingQuoteId ? { quoteId: editingQuoteId } : {}),
+      quoteId,
+      createdOn: quoteFormData.createdOn || new Date().toLocaleDateString('en-IN'),
       exShowroom: Number(quoteFormData.exShowroom || 0),
       rto: Number(quoteFormData.rto || 0),
       insurance: Number(quoteFormData.insurance || 0),
@@ -828,6 +904,9 @@ export default function LeadsManagement({
     const saved = await addQuotation(quotePayload);
     setGeneratedQuote(saved || quotePayload);
     setEditingQuoteId(null);
+    setActiveFormTab(null);
+    setQuoteSuccessMsg(`Quotation #${quoteId} saved successfully!`);
+    setTimeout(() => setQuoteSuccessMsg(''), 4000);
   };
 
   const filteredLeads = leads.filter(l => {
@@ -1138,6 +1217,23 @@ export default function LeadsManagement({
               </button>
             </div>
             <div className="card-body" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {quoteSuccessMsg && (
+                <div style={{
+                  padding: '10px 14px',
+                  backgroundColor: '#ecfdf5',
+                  color: '#047857',
+                  borderRadius: '6px',
+                  border: '1px solid #a7f3d0',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span>✅</span> <span>{quoteSuccessMsg}</span>
+                </div>
+              )}
+
               {/* Summary Bar */}
               <div style={{
                 display: 'grid',
@@ -1163,24 +1259,41 @@ export default function LeadsManagement({
               <div style={{ maxHeight: '420px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {quotations && quotations.length > 0 ? (
                   quotations.map((q, idx) => (
-                    <div key={idx} style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '10px 12px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      backgroundColor: generatedQuote?.quoteId === q.quoteId ? '#f0fdf4' : '#ffffff',
-                      borderColor: generatedQuote?.quoteId === q.quoteId ? '#b4f4d2' : '#e5e7eb',
-                      fontSize: '0.8rem'
-                    }}>
+                    <div
+                      key={idx}
+                      onClick={() => setGeneratedQuote(q)}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '10px 12px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        backgroundColor: (generatedQuote?.quoteId === q.quoteId) ? '#f0fdf4' : '#ffffff',
+                        borderColor: (generatedQuote?.quoteId === q.quoteId) ? '#86efac' : '#e5e7eb',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
                       <div>
                         <strong>Quote #{q.quoteId}</strong> | {q.customerName || 'Walk-in'}<br />
                         <span style={{ color: '#6b7280' }}>Date: {q.createdOn} | {q.vehicleModel} ({q.vehicleColor})</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <strong style={{ color: '#059669', marginRight: '4px' }}>₹{q.total.toLocaleString('en-IN')}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                        <strong style={{ color: '#059669', marginRight: '4px' }}>₹{Number(q.total || 0).toLocaleString('en-IN')}</strong>
                         
+                        {/* Convert to Invoice Button */}
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '4px 8px', color: '#059669', borderColor: '#a7f3d0', backgroundColor: '#ecfdf5', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.75rem', fontWeight: 600 }}
+                          onClick={() => handleConvertQuoteToInvoice(q)}
+                          title="Convert this Quotation to Tax Invoice"
+                        >
+                          <FileText size={12} /> Convert to Invoice
+                        </button>
+
                         {/* WhatsApp Share Button */}
                         <button
                           type="button"
@@ -1312,11 +1425,19 @@ export default function LeadsManagement({
                     <div className="invoice-totals">
                       <div className="invoice-row bold" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '1rem', borderBottom: '1px solid #000' }}>
                         <span>Consolidated On-Road:</span>
-                        <span style={{ color: '#059669' }}>₹{generatedQuote.total.toLocaleString('en-IN')}</span>
+                        <span style={{ color: '#059669' }}>₹{Number(generatedQuote.total || 0).toLocaleString('en-IN')}</span>
                       </div>
                     </div>
 
                     <div style={{ marginTop: '24px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        style={{ flex: 1, minWidth: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', backgroundColor: '#059669', color: '#fff', fontWeight: 600 }}
+                        onClick={() => handleConvertQuoteToInvoice(generatedQuote)}
+                      >
+                        <FileText size={14} /> Convert to Tax Invoice
+                      </button>
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
@@ -1328,7 +1449,7 @@ export default function LeadsManagement({
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
-                        style={{ flex: 1, minWidth: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', backgroundColor: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8' }}
+                        style={{ flex: 1, minWidth: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', backgroundColor: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8' }}
                         onClick={() => handleEditQuotation(generatedQuote)}
                       >
                         <Edit2 size={14} /> Edit Quote
@@ -1336,13 +1457,10 @@ export default function LeadsManagement({
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
-                        style={{ flex: 1, minWidth: '130px' }}
+                        style={{ flex: 1, minWidth: '120px' }}
                         onClick={() => setPrintModalConfig({ isOpen: true, type: 'quotation', data: generatedQuote })}
                       >
                         <Printer size={14} /> Print Preview
-                      </button>
-                      <button type="button" className="btn btn-primary btn-sm" style={{ padding: '6px 14px' }} onClick={() => setGeneratedQuote(null)}>
-                        Close
                       </button>
                     </div>
                   </div>
@@ -1379,6 +1497,23 @@ export default function LeadsManagement({
               </button>
             </div>
             <div className="card-body" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {bookingSuccessMsg && (
+                <div style={{
+                  padding: '10px 14px',
+                  backgroundColor: '#ecfdf5',
+                  color: '#047857',
+                  borderRadius: '6px',
+                  border: '1px solid #a7f3d0',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span>✅</span> <span>{bookingSuccessMsg}</span>
+                </div>
+              )}
+
               {/* Summary Bar */}
               <div style={{
                 display: 'grid',
@@ -1404,22 +1539,28 @@ export default function LeadsManagement({
               <div style={{ maxHeight: '420px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {bookings && bookings.length > 0 ? (
                   bookings.map((b, idx) => (
-                    <div key={idx} style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '10px 12px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      backgroundColor: generatedBooking?.id === b.id ? '#f0fdf4' : '#ffffff',
-                      borderColor: generatedBooking?.id === b.id ? '#b4f4d2' : '#e5e7eb',
-                      fontSize: '0.8rem'
-                    }}>
+                    <div
+                      key={idx}
+                      onClick={() => setGeneratedBooking(b)}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '10px 12px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        backgroundColor: generatedBooking?.id === b.id ? '#f0fdf4' : '#ffffff',
+                        borderColor: generatedBooking?.id === b.id ? '#86efac' : '#e5e7eb',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
                       <div>
                         <strong>Booking #{b.id}</strong> | {b.customerName}<br />
                         <span style={{ color: '#6b7280' }}>Date: {b.bookingDate} | {b.vehicleModel} ({b.vehicleColor})</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
                         <strong style={{ color: '#059669', marginRight: '4px' }}>₹{Number(b.bookingAmount || 0).toLocaleString('en-IN')}</strong>
                         <button
                           type="button"
@@ -1675,12 +1816,14 @@ export default function LeadsManagement({
                     <label className="form-label">Mobile Number *</label>
                     <input
                       type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
                       className="form-control"
                       placeholder="10-digit number"
                       required
                       pattern="[0-9]{10}"
                       value={invoiceFormData.customerPhone}
-                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerPhone: e.target.value })}
+                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerPhone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                     />
                   </div>
                 </div>
@@ -1702,8 +1845,9 @@ export default function LeadsManagement({
                       type="text"
                       className="form-control"
                       placeholder="15-digit GSTIN"
+                      style={{ textTransform: 'uppercase' }}
                       value={invoiceFormData.customerGst}
-                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerGst: e.target.value })}
+                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerGst: e.target.value.toUpperCase() })}
                     />
                   </div>
                 </div>
@@ -1722,7 +1866,7 @@ export default function LeadsManagement({
               {/* SECTION 2: VEHICLE TECHNICAL DETAILS */}
               <div style={{ marginBottom: '20px', borderBottom: '1px solid #f3f4f6', paddingBottom: '16px' }}>
                 <h4 style={{ fontSize: '0.85rem', color: '#059669', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px', fontWeight: 700 }}>
-                  2. Vehicle Technical Details
+                  2. Vehicle Technical Details (Uppercase)
                 </h4>
                 <div className="form-grid">
                   <div className="form-group">
@@ -1765,8 +1909,9 @@ export default function LeadsManagement({
                       type="text"
                       className="form-control"
                       placeholder="Enter 17-digit Chassis VIN"
+                      style={{ textTransform: 'uppercase' }}
                       value={invoiceFormData.vinNumber}
-                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, vinNumber: e.target.value })}
+                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, vinNumber: e.target.value.toUpperCase() })}
                     />
                   </div>
                   <div className="form-group">
@@ -1775,8 +1920,9 @@ export default function LeadsManagement({
                       type="text"
                       className="form-control"
                       placeholder="Battery serial number"
+                      style={{ textTransform: 'uppercase' }}
                       value={invoiceFormData.batteryNumber}
-                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, batteryNumber: e.target.value })}
+                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, batteryNumber: e.target.value.toUpperCase() })}
                     />
                   </div>
                 </div>
@@ -1787,8 +1933,9 @@ export default function LeadsManagement({
                       type="text"
                       className="form-control"
                       placeholder="Charger serial number"
+                      style={{ textTransform: 'uppercase' }}
                       value={invoiceFormData.chargerNumber}
-                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, chargerNumber: e.target.value })}
+                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, chargerNumber: e.target.value.toUpperCase() })}
                     />
                   </div>
                   <div className="form-group">
@@ -1797,8 +1944,9 @@ export default function LeadsManagement({
                       type="text"
                       className="form-control"
                       placeholder="Controller serial number"
+                      style={{ textTransform: 'uppercase' }}
                       value={invoiceFormData.controllerNumber}
-                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, controllerNumber: e.target.value })}
+                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, controllerNumber: e.target.value.toUpperCase() })}
                     />
                   </div>
                 </div>
@@ -1991,6 +2139,24 @@ export default function LeadsManagement({
               </div>
             </div>
             <div className="card-body" style={{ maxHeight: '680px', overflowY: 'auto', padding: '12px' }}>
+              {invoiceSuccessMsg && (
+                <div style={{
+                  padding: '10px 14px',
+                  backgroundColor: '#ecfdf5',
+                  color: '#047857',
+                  borderRadius: '6px',
+                  border: '1px solid #a7f3d0',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '12px'
+                }}>
+                  <span>✅</span> <span>{invoiceSuccessMsg}</span>
+                </div>
+              )}
+
               {/* Invoice History Stats Summary */}
               <div style={{
                 display: 'grid',
@@ -2022,23 +2188,29 @@ export default function LeadsManagement({
               {invoices && invoices.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {invoices.map((inv, idx) => (
-                    <div key={idx} style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '10px 12px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      backgroundColor: generatedInvoice?.invoiceNo === inv.invoiceNo ? '#f0fdf4' : '#ffffff',
-                      borderColor: generatedInvoice?.invoiceNo === inv.invoiceNo ? '#b4f4d2' : '#e5e7eb',
-                      fontSize: '0.8rem'
-                    }}>
+                    <div
+                      key={idx}
+                      onClick={() => setGeneratedInvoice(inv)}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '10px 12px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        backgroundColor: generatedInvoice?.invoiceNo === inv.invoiceNo ? '#f0fdf4' : '#ffffff',
+                        borderColor: generatedInvoice?.invoiceNo === inv.invoiceNo ? '#86efac' : '#e5e7eb',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
                       <div>
                         <strong>Inv #{inv.invoiceNo}</strong> | {inv.customerName}<br />
                         <span style={{ color: '#6b7280' }}>Date: {inv.invoiceDate || inv.createdOn} | {inv.vehicleModel}</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <strong style={{ color: '#059669', marginRight: '4px' }}>₹{inv.grandTotal.toLocaleString('en-IN')}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                        <strong style={{ color: '#059669', marginRight: '4px' }}>₹{Number(inv.grandTotal || 0).toLocaleString('en-IN')}</strong>
                         
                         {/* WhatsApp Share Button */}
                         <button
@@ -2384,12 +2556,14 @@ export default function LeadsManagement({
                     <label className="form-label">Mobile Number *</label>
                     <input
                       type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
                       className="form-control"
                       placeholder="10-digit number"
                       required
                       pattern="[0-9]{10}"
                       value={leadFormData.mobile}
-                      onChange={(e) => setLeadFormData({ ...leadFormData, mobile: e.target.value })}
+                      onChange={(e) => setLeadFormData({ ...leadFormData, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                     />
                   </div>
                   <div className="form-group">
@@ -2639,10 +2813,13 @@ export default function LeadsManagement({
                   <label className="form-label">Mobile Number</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
                     className="form-control"
-                    placeholder="Enter mobile number"
+                    placeholder="10-digit mobile"
+                    pattern="[0-9]{10}"
                     value={quoteFormData.customerPhone}
-                    onChange={(e) => setQuoteFormData({ ...quoteFormData, customerPhone: e.target.value })}
+                    onChange={(e) => setQuoteFormData({ ...quoteFormData, customerPhone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                   />
                 </div>
               </div>
@@ -2876,12 +3053,14 @@ export default function LeadsManagement({
                   <label className="form-label">Mobile Number *</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
                     className="form-control"
                     placeholder="10-digit number"
                     required
                     pattern="[0-9]{10}"
                     value={bookingForm.mobile}
-                    onChange={(e) => setBookingForm({ ...bookingForm, mobile: e.target.value })}
+                    onChange={(e) => setBookingForm({ ...bookingForm, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                   />
                 </div>
               </div>

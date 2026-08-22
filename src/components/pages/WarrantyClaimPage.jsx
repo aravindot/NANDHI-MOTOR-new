@@ -593,10 +593,13 @@ export default function WarrantyClaimPage({
                     Mobile Number
                   </label>
                   <input
-                    type="text"
-                    placeholder="9842100000"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="10-digit mobile"
+                    pattern="[0-9]{10}"
                     value={formData.customerMobile}
-                    onChange={(e) => setFormData({ ...formData, customerMobile: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, customerMobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}
                   />
                 </div>

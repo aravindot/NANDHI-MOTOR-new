@@ -555,43 +555,48 @@ export default function App() {
 
   // Add or Update an Invoice in backend database
   const addInvoice = async (invoicePayload) => {
+    const invoiceNo = invoicePayload.invoiceNo || String(invoices.reduce((max, inv) => {
+      const n = parseInt((inv.invoiceNo || '').replace(/\D/g, ''), 10);
+      return !isNaN(n) && n > max ? n : max;
+    }, 0) + 1).padStart(2, '0');
+
+    const payload = {
+      ...invoicePayload,
+      invoiceNo,
+      createdOn: invoicePayload.createdOn || new Date().toLocaleDateString('en-IN')
+    };
+
+    // Synchronously update local state immediately so UI re-renders without lag
+    setInvoices(prev => {
+      const idx = prev.findIndex(inv => String(inv.invoiceNo) === String(invoiceNo));
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = payload;
+        return next;
+      }
+      return [payload, ...prev];
+    });
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/invoices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(invoicePayload)
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         const saved = await res.json();
-        setInvoices(prev => {
-          const idx = prev.findIndex(inv => inv.invoiceNo === saved.invoiceNo);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = saved;
-            return next;
-          }
-          return [saved, ...prev];
-        });
+        setInvoices(prev => prev.map(inv => String(inv.invoiceNo) === String(invoiceNo) ? saved : inv));
         return saved;
       }
     } catch (err) {
       console.error('Failed to save invoice to MongoDB:', err);
     }
-    // Fallback local state
-    setInvoices(prev => {
-      const idx = prev.findIndex(inv => inv.invoiceNo === invoicePayload.invoiceNo);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = invoicePayload;
-        return next;
-      }
-      return [invoicePayload, ...prev];
-    });
-    return invoicePayload;
+    return payload;
   };
 
   // Delete an Invoice from backend database
   const deleteInvoice = async (invoiceNo) => {
+    setInvoices(prev => prev.filter(inv => String(inv.invoiceNo) !== String(invoiceNo)));
     try {
       await fetch(`${API_BASE_URL}/api/invoices/${invoiceNo}`, {
         method: 'DELETE'
@@ -599,48 +604,52 @@ export default function App() {
     } catch (err) {
       console.error('Failed to delete invoice from MongoDB:', err);
     }
-    setInvoices(prev => prev.filter(inv => inv.invoiceNo !== invoiceNo));
   };
 
   // Add or Update a Quotation in backend database
   const addQuotation = async (quotePayload) => {
+    const quoteId = quotePayload.quoteId || `QT-${String(quotations.reduce((max, q) => {
+      const n = parseInt((q.quoteId || '').replace(/\D/g, ''), 10);
+      return !isNaN(n) && n > max ? n : max;
+    }, 0) + 1).padStart(2, '0')}`;
+
+    const payload = {
+      ...quotePayload,
+      quoteId,
+      createdOn: quotePayload.createdOn || new Date().toLocaleDateString('en-IN')
+    };
+
+    // Synchronously update local state immediately
+    setQuotations(prev => {
+      const idx = prev.findIndex(q => String(q.quoteId) === String(quoteId));
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = payload;
+        return next;
+      }
+      return [payload, ...prev];
+    });
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/quotations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(quotePayload)
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         const saved = await res.json();
-        setQuotations(prev => {
-          const idx = prev.findIndex(q => q.quoteId === saved.quoteId);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = saved;
-            return next;
-          }
-          return [saved, ...prev];
-        });
+        setQuotations(prev => prev.map(q => String(q.quoteId) === String(quoteId) ? saved : q));
         return saved;
       }
     } catch (err) {
       console.error('Failed to save quotation to MongoDB:', err);
     }
-    // Fallback local state if server is down
-    setQuotations(prev => {
-      const idx = prev.findIndex(q => q.quoteId === quotePayload.quoteId);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = quotePayload;
-        return next;
-      }
-      return [quotePayload, ...prev];
-    });
-    return quotePayload;
+    return payload;
   };
 
   // Delete a Quotation from backend database
   const deleteQuotation = async (quoteId) => {
+    setQuotations(prev => prev.filter(q => String(q.quoteId) !== String(quoteId)));
     try {
       await fetch(`${API_BASE_URL}/api/quotations/${quoteId}`, {
         method: 'DELETE'
@@ -648,7 +657,6 @@ export default function App() {
     } catch (err) {
       console.error('Failed to delete quotation from MongoDB:', err);
     }
-    setQuotations(prev => prev.filter(q => q.quoteId !== quoteId));
   };
 
   // JobSheets Sync Helpers

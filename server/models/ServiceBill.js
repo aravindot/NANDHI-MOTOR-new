@@ -4,6 +4,8 @@ const serviceBillSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   jobSheetId: { type: String, default: '' },
   customerName: { type: String, default: '' },
+  customerMobile: { type: String, default: '' },
+  customerPhone: { type: String, default: '' },
   vehicleNo: { type: String, default: '' },
   serviceType: { type: String, default: 'Paid Service' },
   laborItems: { type: Array, default: [] },

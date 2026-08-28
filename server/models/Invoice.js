@@ -4,6 +4,8 @@ const invoiceSchema = new mongoose.Schema({
   invoiceNo: { type: String, required: true, unique: true },
   invoiceDate: { type: String, required: true },
   customerName: { type: String, required: true },
+  customerPhone: { type: String, default: '' },
+  customerMobile: { type: String, default: '' },
   customerAddress: { type: String },
   customerAadhar: { type: String },
   customerGst: { type: String },

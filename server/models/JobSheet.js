@@ -4,6 +4,7 @@ const jobSheetSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   customerName: { type: String, default: '' },
   customerPhone: { type: String, default: '' },
+  customerMobile: { type: String, default: '' },
   vehicleNo: { type: String, default: '' },
   vehicleKm: { type: String, default: '' },
   complaints: { type: String, default: '' },

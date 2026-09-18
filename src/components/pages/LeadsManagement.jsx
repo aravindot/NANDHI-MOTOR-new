@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Search, Phone, CheckCircle, Trash2, Calendar, Clipboard, Calculator, Printer, FileCode, Edit2, MessageCircle, BarChart3, Download, Filter, TrendingUp, DollarSign, FileDown } from 'lucide-react';
+import { UserPlus, Search, Phone, CheckCircle, Trash2, Calendar, Clipboard, Calculator, Printer, FileCode, Edit2, MessageCircle, BarChart3, Download, Filter, TrendingUp, DollarSign, FileDown, FileText } from 'lucide-react';
 import PrintPreviewModal from '../PrintPreviewModal';
 import { generateQuotationPdfAndShare, generateInvoicePdfAndShare } from '../../utils/pdfShareUtil';
 import { API_BASE_URL } from '../../config/api';
@@ -517,6 +517,28 @@ export default function LeadsManagement({
     setEditingInvoiceId(null);
     setActiveSubTab('invoice');
     setActiveFormTab('invoice');
+  };
+
+  // Open New Quotation Modal with initial defaults
+  const handleOpenAddQuote = () => {
+    setEditingQuoteId(null);
+    const defaultModel = (vehicleList && vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G';
+    const matchedVeh = vehicleList && vehicleList.find(v => v.name === defaultModel);
+    const defaultPrice = matchedVeh ? matchedVeh.basePrice : 82000;
+    const defaultColor = (allVehicleColors && allVehicleColors[0]) || 'Matte Blue';
+    setQuoteFormData({
+      customerName: '',
+      customerPhone: '',
+      vehicleModel: defaultModel,
+      vehicleColor: defaultColor,
+      exShowroom: defaultPrice,
+      rto: 10400,
+      insurance: 6200,
+      accessories: 1500,
+      handling: 0,
+      discount: 0
+    });
+    setActiveFormTab('quote');
   };
 
   // Edit Handlers for Quotation and Invoice
@@ -1211,7 +1233,7 @@ export default function LeadsManagement({
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
-                onClick={() => setActiveFormTab('quote')}
+                onClick={handleOpenAddQuote}
               >
                 + Create Quotation
               </button>
@@ -1351,8 +1373,15 @@ export default function LeadsManagement({
                     </div>
                   ))
                 ) : (
-                  <div style={{ textAlign: 'center', padding: '16px', color: '#9ca3af', fontSize: '0.8rem' }}>
-                    No saved quotations. Generate one to store.
+                  <div style={{ textAlign: 'center', padding: '30px 16px', color: '#9ca3af', fontSize: '0.85rem' }}>
+                    <p style={{ marginBottom: '12px' }}>No saved quotations yet.</p>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={handleOpenAddQuote}
+                    >
+                      + Create First Quotation
+                    </button>
                   </div>
                 )}
               </div>
@@ -1465,9 +1494,16 @@ export default function LeadsManagement({
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '180px', color: '#9ca3af', textAlign: 'center' }}>
-                    <Clipboard size={48} strokeWidth={1} style={{ marginBottom: '12px' }} />
-                    <p>Select a quotation from the ledger on the left to preview.</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '240px', color: '#9ca3af', textAlign: 'center' }}>
+                    <Calculator size={48} strokeWidth={1} style={{ marginBottom: '12px', color: '#059669' }} />
+                    <p style={{ marginBottom: '12px' }}>Select a quotation from the ledger on the left to preview, or create a new one.</p>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={handleOpenAddQuote}
+                    >
+                      + Create New Quotation
+                    </button>
                   </div>
                 )}
               </div>

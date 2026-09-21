@@ -17,13 +17,15 @@ export default function PrintPreviewModal({
   const profile = React.useMemo(() => {
     if (propProfile) return propProfile;
     try {
-      const saved = localStorage.getItem('nandhi_company_profile');
-      if (saved) return JSON.parse(saved);
+      const primary = localStorage.getItem('nandhi_app_company_profile');
+      if (primary) return JSON.parse(primary);
+      const legacy = localStorage.getItem('nandhi_company_profile');
+      if (legacy) return JSON.parse(legacy);
     } catch (e) {}
     return {
       name: 'NANDHI MOTORS',
       tagline: 'Authorized Two-Wheeler Sales, Genuine Spares & Service Dealership',
-      address: 'SF No. 124/2, Trichy Main Road, Namakkal, Tamil Nadu - 637001',
+      address: 'No. 12, Palani Main Road, Palani, Dindigul, Tamil Nadu - 624601',
       phone: '+91 98421 55670',
       email: 'contact@nandhimotors.com',
       website: 'www.nandhimotors.com',

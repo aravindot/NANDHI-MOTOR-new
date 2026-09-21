@@ -137,12 +137,20 @@ export default function App() {
   });
 
   // Shared Company Profile State
-  const [companyProfile, setCompanyProfile] = useState(() => {
-    const saved = localStorage.getItem('nandhi_app_company_profile');
-    return saved ? JSON.parse(saved) : {
+  const readCompanyProfileFromStorage = () => {
+    try {
+      const primary = localStorage.getItem('nandhi_app_company_profile');
+      if (primary) return JSON.parse(primary);
+      const legacy = localStorage.getItem('nandhi_company_profile');
+      if (legacy) return JSON.parse(legacy);
+    } catch (e) {
+      console.warn('Unable to read saved company profile from localStorage.', e);
+    }
+
+    return {
       name: 'NANDHI MOTORS',
       tagline: 'Authorized Two-Wheeler Sales, Genuine Spares & Service Dealership',
-      address: 'SF No. 124/2, Trichy Main Road, Namakkal, Tamil Nadu - 637001',
+      address: 'No. 12, Palani Main Road, Palani, Dindigul, Tamil Nadu - 624601',
       phone: '+91 98421 55670',
       altPhone: '+91 94432 19800',
       email: 'contact@nandhimotors.com',
@@ -162,10 +170,14 @@ export default function App() {
 4. Full on-road payment is required prior to vehicle invoicing and registration dispatch.
 5. Standard accessories & helmet are supplied per dealership delivery policy.`
     };
-  });
+  };
+
+  const [companyProfile, setCompanyProfile] = useState(readCompanyProfileFromStorage);
 
   useEffect(() => {
+    if (!companyProfile) return;
     localStorage.setItem('nandhi_app_company_profile', JSON.stringify(companyProfile));
+    localStorage.setItem('nandhi_company_profile', JSON.stringify(companyProfile));
   }, [companyProfile]);
 
   useEffect(() => {
@@ -276,10 +288,31 @@ export default function App() {
       }
 
       try {
+        const savedPrimary = localStorage.getItem('nandhi_app_company_profile');
+        const savedLegacy = localStorage.getItem('nandhi_company_profile');
+        const savedProfile = savedPrimary || savedLegacy;
+        const hasLocalProfile = !!savedProfile && savedProfile !== 'null';
+
         const profRes = await fetch(`${API_BASE_URL}/api/company-profile`);
         if (profRes.ok) {
           const profData = await profRes.json();
-          if (profData && profData.name) setCompanyProfile(profData);
+          if (profData && profData.name) {
+            if (!hasLocalProfile) {
+              setCompanyProfile(profData);
+            } else {
+              let parsedLocal = null;
+              try {
+                parsedLocal = JSON.parse(savedProfile);
+              } catch (e) {
+                parsedLocal = null;
+              }
+              if (parsedLocal && parsedLocal.name) {
+                setCompanyProfile(parsedLocal);
+              } else {
+                setCompanyProfile(profData);
+              }
+            }
+          }
         }
       } catch (e) {
         console.warn('Fallback to local storage for company profile.');
@@ -824,12 +857,15 @@ export default function App() {
   // Company Profile Sync Helper
   const handleSetCompanyProfile = async (action) => {
     const updated = typeof action === 'function' ? action(companyProfile) : action;
-    setCompanyProfile(updated);
+    const nextProfile = { ...(companyProfile || {}), ...(updated || {}) };
+    setCompanyProfile(nextProfile);
+    localStorage.setItem('nandhi_app_company_profile', JSON.stringify(nextProfile));
+    localStorage.setItem('nandhi_company_profile', JSON.stringify(nextProfile));
     try {
       await fetch(`${API_BASE_URL}/api/company-profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
+        body: JSON.stringify(nextProfile)
       });
     } catch (e) {
       console.error('Failed to sync company profile with MongoDB:', e);

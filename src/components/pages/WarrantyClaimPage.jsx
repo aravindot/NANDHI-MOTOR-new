@@ -424,7 +424,7 @@ export default function WarrantyClaimPage({
             <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
             <input
               type="text"
-              placeholder="Search by Claim ID, Customer, Vehicle Reg, or Part..."
+              placeholder="Search claims..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{

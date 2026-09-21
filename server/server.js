@@ -43,7 +43,6 @@ mongoose
   .connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
   .then(async () => {
     console.log('Connected to MongoDB Atlas successfully.');
-    await seedDatabase();
   })
   .catch((err) => {
     console.error('MongoDB Connection Error:', err.message);
@@ -182,7 +181,12 @@ async function seedDatabase() {
         accountName: 'NANDHI MOTORS',
         accountNumber: '50200088991234',
         ifscCode: 'HDFC0001234',
-        branch: 'Namakkal Main Branch'
+        branch: 'Namakkal Main Branch',
+        quotationTerms: `1. Prices quoted are valid for 7 days from the date of issuance and subject to manufacturer price revisions.
+2. Final delivery is subject to availability of vehicle stock and color chosen at the time of final booking.
+3. RTO registration, road tax, and insurance charges are subject to statutory revisions by Government authorities.
+4. Full on-road payment is required prior to vehicle invoicing and registration dispatch.
+5. Standard accessories and helmet are supplied according to dealership delivery policy.`
       });
     }
 
@@ -191,6 +195,15 @@ async function seedDatabase() {
     console.error('Error during database seeding:', error.message);
   }
 }
+
+// Data Sanitization Helper (strips immutable MongoDB _id and __v)
+const cleanDoc = (body) => {
+  if (!body || typeof body !== 'object') return {};
+  const copy = { ...body };
+  delete copy._id;
+  delete copy.__v;
+  return copy;
+};
 
 // ==========================================
 // 1. VEHICLE API ROUTES
@@ -207,7 +220,7 @@ app.get('/api/vehicles', async (req, res) => {
 app.post('/api/vehicles', async (req, res) => {
   try {
     const id = req.body.id || `VEH-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, id };
+    const data = { ...cleanDoc(req.body), id };
     const saved = await Vehicle.findOneAndUpdate({ id }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {
@@ -239,7 +252,7 @@ app.get('/api/leads', async (req, res) => {
 app.post('/api/leads', async (req, res) => {
   try {
     const id = req.body.id || `L-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, id };
+    const data = { ...cleanDoc(req.body), id };
     const saved = await Lead.findOneAndUpdate({ id }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {
@@ -249,9 +262,10 @@ app.post('/api/leads', async (req, res) => {
 
 app.put('/api/leads/:id', async (req, res) => {
   try {
+    const data = cleanDoc(req.body);
     const saved = await Lead.findOneAndUpdate(
       { id: req.params.id },
-      { $set: req.body },
+      { $set: data },
       { new: true }
     );
     res.json(saved);
@@ -284,7 +298,7 @@ app.get('/api/customers', async (req, res) => {
 app.post('/api/customers', async (req, res) => {
   try {
     const id = req.body.id || `C-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, id };
+    const data = { ...cleanDoc(req.body), id };
     const saved = await Customer.findOneAndUpdate(
       { mobile: req.body.mobile },
       { $set: data },
@@ -320,7 +334,7 @@ app.get('/api/bookings', async (req, res) => {
 app.post('/api/bookings', async (req, res) => {
   try {
     const id = req.body.id || `BK-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, id };
+    const data = { ...cleanDoc(req.body), id };
     const saved = await Booking.findOneAndUpdate({ id }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {
@@ -352,7 +366,7 @@ app.get('/api/spares', async (req, res) => {
 app.post('/api/spares', async (req, res) => {
   try {
     const id = req.body.id || `SPR-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, id };
+    const data = { ...cleanDoc(req.body), id };
     const saved = await Spare.findOneAndUpdate({ id }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {
@@ -384,7 +398,7 @@ app.get('/api/invoices', async (req, res) => {
 app.post('/api/invoices', async (req, res) => {
   try {
     const invoiceNo = req.body.invoiceNo || `INV-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, invoiceNo };
+    const data = { ...cleanDoc(req.body), invoiceNo };
     const saved = await Invoice.findOneAndUpdate({ invoiceNo }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {
@@ -416,7 +430,7 @@ app.get('/api/quotations', async (req, res) => {
 app.post('/api/quotations', async (req, res) => {
   try {
     const quoteId = req.body.quoteId || `QT-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, quoteId };
+    const data = { ...cleanDoc(req.body), quoteId };
     const saved = await Quotation.findOneAndUpdate({ quoteId }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {
@@ -448,7 +462,7 @@ app.get('/api/jobsheets', async (req, res) => {
 app.post('/api/jobsheets', async (req, res) => {
   try {
     const id = req.body.id || `JS-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, id };
+    const data = { ...cleanDoc(req.body), id };
     const saved = await JobSheet.findOneAndUpdate({ id }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {
@@ -480,7 +494,7 @@ app.get('/api/service-bills', async (req, res) => {
 app.post('/api/service-bills', async (req, res) => {
   try {
     const id = req.body.id || `SB-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, id };
+    const data = { ...cleanDoc(req.body), id };
     const saved = await ServiceBill.findOneAndUpdate({ id }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {
@@ -512,7 +526,7 @@ app.get('/api/expenses', async (req, res) => {
 app.post('/api/expenses', async (req, res) => {
   try {
     const id = req.body.id || `EXP-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, id };
+    const data = { ...cleanDoc(req.body), id };
     const saved = await Expense.findOneAndUpdate({ id }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {
@@ -544,7 +558,7 @@ app.get('/api/purchases', async (req, res) => {
 app.post('/api/purchases', async (req, res) => {
   try {
     const id = req.body.id || `PUR-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, id };
+    const data = { ...cleanDoc(req.body), id };
     const saved = await PurchaseInvoice.findOneAndUpdate({ id }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {
@@ -576,7 +590,7 @@ app.get('/api/warranties', async (req, res) => {
 app.post('/api/warranties', async (req, res) => {
   try {
     const id = req.body.id || `WC-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, id };
+    const data = { ...cleanDoc(req.body), id };
     const saved = await WarrantyClaim.findOneAndUpdate({ id }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {
@@ -608,7 +622,7 @@ app.get('/api/executives', async (req, res) => {
 app.post('/api/executives', async (req, res) => {
   try {
     const id = req.body.id || `EMP-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, id };
+    const data = { ...cleanDoc(req.body), id };
     const saved = await Executive.findOneAndUpdate({ id }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {
@@ -639,8 +653,12 @@ app.get('/api/company-profile', async (req, res) => {
 
 app.post('/api/company-profile', async (req, res) => {
   try {
-    const data = { ...req.body, id: 'main_profile' };
-    const saved = await CompanyProfile.findOneAndUpdate({ id: 'main_profile' }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
+    const data = { ...cleanDoc(req.body), id: 'main_profile' };
+    const saved = await CompanyProfile.findOneAndUpdate(
+      { id: 'main_profile' },
+      { $set: data },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
     res.status(200).json(saved);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -662,7 +680,7 @@ app.get('/api/loyalty-balances', async (req, res) => {
 app.post('/api/loyalty-balances', async (req, res) => {
   try {
     const id = req.body.id || `C-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, id };
+    const data = { ...cleanDoc(req.body), id };
     const saved = await LoyaltyBalance.findOneAndUpdate({ id }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {
@@ -682,7 +700,7 @@ app.get('/api/redemptions', async (req, res) => {
 app.post('/api/redemptions', async (req, res) => {
   try {
     const id = req.body.id || `RED-${Date.now().toString().slice(-4)}`;
-    const data = { ...req.body, id };
+    const data = { ...cleanDoc(req.body), id };
     const saved = await Redemption.findOneAndUpdate({ id }, { $set: data }, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.status(201).json(saved);
   } catch (err) {

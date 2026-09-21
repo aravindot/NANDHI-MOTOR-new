@@ -17,19 +17,27 @@ import {
 export default function Sidebar({ activeTab, activeSubTab, onChangeTab, isOpen, onClose }) {
   // Keep track of which sections are collapsed
   const [expandedSections, setExpandedSections] = useState({
-    leads: true,
-    service: true,
-    spares: true,
-    purchase: true,
-    accounting: true,
-    management: true
+    leads: false,
+    service: false,
+    spares: false,
+    purchase: false,
+    accounting: false,
+    management: false
   });
 
   const toggleSection = (section) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
+    setExpandedSections((prev) => {
+      const nextState = {
+        leads: false,
+        service: false,
+        spares: false,
+        purchase: false,
+        accounting: false,
+        management: false
+      };
+      nextState[section] = !prev[section];
+      return nextState;
+    });
   };
 
   const handleTabClick = (tab, subTab = null) => {
@@ -306,31 +314,85 @@ export default function Sidebar({ activeTab, activeSubTab, onChangeTab, isOpen, 
           {expandedSections.accounting && (
             <div className="submenu-list">
               <div
-                className={`submenu-item ${activeTab === 'accounting' && activeSubTab === 'ledger' ? 'active' : ''}`}
+                className={`submenu-item ${activeTab === 'accounting' && (activeSubTab === 'receivable' || (!activeSubTab && false)) ? 'active' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleTabClick('accounting', 'ledger');
+                  handleTabClick('accounting', 'receivable');
                 }}
               >
-                Ledger
+                Receivable
               </div>
               <div
-                className={`submenu-item ${activeTab === 'accounting' && activeSubTab === 'daily-expenses' ? 'active' : ''}`}
+                className={`submenu-item ${activeTab === 'accounting' && activeSubTab === 'payable' ? 'active' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleTabClick('accounting', 'daily-expenses');
+                  handleTabClick('accounting', 'payable');
                 }}
               >
-                Daily Expenses
+                Payable
               </div>
               <div
-                className={`submenu-item ${activeTab === 'accounting' && activeSubTab === 'gst-reports' ? 'active' : ''}`}
+                className={`submenu-item ${activeTab === 'accounting' && (activeSubTab === 'daily-expenses' || activeSubTab === 'expense') ? 'active' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleTabClick('accounting', 'gst-reports');
+                  handleTabClick('accounting', 'expense');
                 }}
               >
-                GST Reports
+                Expense
+              </div>
+              <div
+                className={`submenu-item ${activeTab === 'accounting' && (activeSubTab === 'ledger' || activeSubTab === 'general-ledger') ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTabClick('accounting', 'general-ledger');
+                }}
+              >
+                General Ledger
+              </div>
+              <div
+                className={`submenu-item ${activeTab === 'accounting' && activeSubTab === 'trial-balance' ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTabClick('accounting', 'trial-balance');
+                }}
+              >
+                Trial Balance
+              </div>
+              <div
+                className={`submenu-item ${activeTab === 'accounting' && activeSubTab === 'pnl' ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTabClick('accounting', 'pnl');
+                }}
+              >
+                P&L Statement
+              </div>
+              <div
+                className={`submenu-item ${activeTab === 'accounting' && activeSubTab === 'balance-sheet' ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTabClick('accounting', 'balance-sheet');
+                }}
+              >
+                Balance Sheet
+              </div>
+              <div
+                className={`submenu-item ${activeTab === 'accounting' && (activeSubTab === 'gst-reports' || activeSubTab === 'gst') ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTabClick('accounting', 'gst');
+                }}
+              >
+                GST (1, 2B, 3B)
+              </div>
+              <div
+                className={`submenu-item ${activeTab === 'accounting' && (activeSubTab === 'bank-cash' || activeSubTab === 'reconciliation') ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTabClick('accounting', 'bank-cash');
+                }}
+              >
+                Bank/Cash & BRS
               </div>
             </div>
           )}
@@ -400,15 +462,6 @@ export default function Sidebar({ activeTab, activeSubTab, onChangeTab, isOpen, 
               >
                 Redeem
               </div>
-              <div
-                className={`submenu-item ${activeTab === 'management' && activeSubTab === 'settings' ? 'active' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleTabClick('management', 'settings');
-                }}
-              >
-                Settings
-              </div>
             </div>
           )}
         </div>
@@ -423,6 +476,19 @@ export default function Sidebar({ activeTab, activeSubTab, onChangeTab, isOpen, 
               <Building2 size={18} />
             </span>
             <span>Company Profile</span>
+          </div>
+        </div>
+
+        {/* 9. Settings */}
+        <div className="menu-item-container">
+          <div
+            className={`menu-item ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => handleTabClick('settings')}
+          >
+            <span className="menu-item-icon">
+              <Settings size={18} />
+            </span>
+            <span>Settings</span>
           </div>
         </div>
       </div>

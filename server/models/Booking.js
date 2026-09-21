@@ -10,6 +10,10 @@ const bookingSchema = new mongoose.Schema({
   deliveryDate: { type: String },
   bookingAmount: { type: Number, required: true },
   paymentMode: { type: String, default: 'Cash' },
+  status: { type: String, default: 'Active' }, // 'Active' | 'Returned' | 'Converted'
+  returnDate: { type: String },
+  returnNotes: { type: String },
+  convertedInvoiceNo: { type: String },
   notes: { type: String },
   createdOn: { type: String, default: () => new Date().toLocaleDateString('en-IN') }
 });

@@ -1,12 +1,24 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Gift, Coins, Award, Sparkles, Check, Plus, Search, CheckCircle, Ticket } from 'lucide-react';
-import { API_BASE_URL } from '../../config/api';
+import React, { useState, useMemo } from 'react';
+import {
+  Gift,
+  Coins,
+  Award,
+  Sparkles,
+  Check,
+  Plus,
+  Search,
+  CheckCircle,
+  Ticket,
+  User,
+  Phone,
+  Trash2,
+  X
+} from 'lucide-react';
 
-export default function RedeemPointsPage({
-  customers = []
-}) {
-  const [activeSubTab, setActiveSubTab] = useState('catalog'); // 'catalog' or 'ledger'
+export default function RedeemPointsPage({ customers = [] }) {
+  const [activeSubTab, setActiveSubTab] = useState('catalog');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [isRedeemModalOpen, setIsRedeemModalOpen] = useState(false);
   const [selectedReward, setSelectedReward] = useState(null);
 
@@ -54,419 +66,341 @@ export default function RedeemPointsPage({
     }
   ];
 
-  // Customer Loyalty Balances & Redemption History
+  // Loyalty balances
   const [loyaltyBalances, setLoyaltyBalances] = useState(() => {
     const saved = localStorage.getItem('nandhi_loyalty_balances');
-    return saved ? JSON.parse(saved) : [
-      { id: 'C-01', name: 'Rajesh Kumar', mobile: '9842155670', totalPoints: 850, redeemedPoints: 250, availablePoints: 600 },
-      { id: 'C-02', name: 'Deepak Sharma', mobile: '9443219800', totalPoints: 500, redeemedPoints: 0, availablePoints: 500 },
-      { id: 'C-03', name: 'Sanjay Kumar', mobile: '9843322110', totalPoints: 1200, redeemedPoints: 400, availablePoints: 800 },
-      { id: 'C-04', name: 'Anitha Ramesh', mobile: '9894123456', totalPoints: 350, redeemedPoints: 0, availablePoints: 350 },
-      { id: 'C-05', name: 'K. Senthil Nathan', mobile: '9443312345', totalPoints: 950, redeemedPoints: 500, availablePoints: 450 }
-    ];
+    return saved
+      ? JSON.parse(saved)
+      : [];
   });
 
   const [redemptions, setRedemptions] = useState(() => {
     const saved = localStorage.getItem('nandhi_redemptions');
-    return saved ? JSON.parse(saved) : [
-      {
-        id: 'RDM-01',
-        customerName: 'Rajesh Kumar',
-        customerMobile: '9842155670',
-        rewardTitle: 'Free Engine Oil Top-Up',
-        pointsSpent: 250,
-        voucherCode: 'OIL-9842-RDM',
-        date: '2026-08-10',
-        status: 'Redeemed'
-      },
-      {
-        id: 'RDM-02',
-        customerName: 'Sanjay Kumar',
-        customerMobile: '9843322110',
-        rewardTitle: 'Free Teflon Polish & Washing',
-        pointsSpent: 400,
-        voucherCode: 'POL-9843-RDM',
-        date: '2026-08-12',
-        status: 'Redeemed'
-      },
-      {
-        id: 'RDM-03',
-        customerName: 'K. Senthil Nathan',
-        customerMobile: '9443312345',
-        rewardTitle: '₹500 Showroom Spares Voucher',
-        pointsSpent: 500,
-        voucherCode: 'SPR-9443-RDM',
-        date: '2026-08-14',
-        status: 'Active'
-      }
-    ];
+    return saved
+      ? JSON.parse(saved)
+      : [];
   });
 
-  // Initial fetch from backend
-  useEffect(() => {
-    const fetchLoyalty = async () => {
-      try {
-        const bRes = await fetch(`${API_BASE_URL}/api/loyalty-balances`);
-        if (bRes.ok) {
-          const bData = await bRes.json();
-          if (Array.isArray(bData) && bData.length > 0) setLoyaltyBalances(bData);
-        }
-      } catch (err) {
-        console.warn('Fallback to local storage for loyalty balances.');
-      }
-
-      try {
-        const rRes = await fetch(`${API_BASE_URL}/api/redemptions`);
-        if (rRes.ok) {
-          const rData = await rRes.json();
-          if (Array.isArray(rData) && rData.length > 0) setRedemptions(rData);
-        }
-      } catch (err) {
-        console.warn('Fallback to local storage for redemptions.');
-      }
-    };
-    fetchLoyalty();
-  }, []);
-
-  React.useEffect(() => {
-    localStorage.setItem('nandhi_loyalty_balances', JSON.stringify(loyaltyBalances));
-  }, [loyaltyBalances]);
-
-  React.useEffect(() => {
-    localStorage.setItem('nandhi_redemptions', JSON.stringify(redemptions));
-  }, [redemptions]);
-
-  // Form State for modal
-  const [selectedCustomerId, setSelectedCustomerId] = useState('');
-
-  const handleOpenRedeemModal = (reward) => {
-    setSelectedReward(reward);
-    setSelectedCustomerId(loyaltyBalances[0]?.id || '');
-    setIsRedeemModalOpen(true);
-  };
-
-  const handleProcessRedeem = async (e) => {
-    e.preventDefault();
-    const cust = loyaltyBalances.find(c => c.id === selectedCustomerId);
-    if (!cust) return;
-
-    if (cust.availablePoints < selectedReward.pointsRequired) {
-      alert(`Customer only has ${cust.availablePoints} points. ${selectedReward.pointsRequired} points needed.`);
-      return;
-    }
-
-    const updatedCustomer = {
-      ...cust,
-      redeemedPoints: cust.redeemedPoints + selectedReward.pointsRequired,
-      availablePoints: cust.availablePoints - selectedReward.pointsRequired
-    };
-
-    // Deduct points
-    setLoyaltyBalances(prev => prev.map(c => c.id === selectedCustomerId ? updatedCustomer : c));
-
-    // Add Redemption Record
-    const newRedemption = {
-      id: `RDM-${String(redemptions.length + 1).padStart(2, '0')}`,
-      customerName: cust.name,
-      customerMobile: cust.mobile,
-      rewardTitle: selectedReward.title,
-      pointsSpent: selectedReward.pointsRequired,
-      voucherCode: `RWD-${Math.floor(100000 + Math.random() * 900000)}`,
-      date: new Date().toISOString().split('T')[0],
-      status: 'Active'
-    };
-
-    setRedemptions([newRedemption, ...redemptions]);
-
-    // Sync to MongoDB
-    try {
-      await fetch(`${API_BASE_URL}/api/loyalty-balances`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedCustomer)
-      });
-      await fetch(`${API_BASE_URL}/api/redemptions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newRedemption)
-      });
-    } catch (err) {
-      console.error('Failed to sync redemption with MongoDB:', err);
-    }
-
-    setIsRedeemModalOpen(false);
-    alert(`Reward redeemed successfully! Voucher Code: ${newRedemption.voucherCode}`);
-  };
-
   const filteredBalances = useMemo(() => {
-    return loyaltyBalances.filter(c => 
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.mobile.includes(searchQuery)
+    const q = searchQuery.toLowerCase().trim();
+    return loyaltyBalances.filter(
+      (b) => !q || b.name.toLowerCase().includes(q) || b.mobile.includes(q) || b.id.toLowerCase().includes(q)
     );
   }, [loyaltyBalances, searchQuery]);
 
+  const activeCustomer =
+    loyaltyBalances.find((b) => b.id === selectedCustomerId) || (filteredBalances.length > 0 ? filteredBalances[0] : null);
+
+  const handleRedeemClick = (reward) => {
+    setSelectedReward(reward);
+    setIsRedeemModalOpen(true);
+  };
+
+  const handleConfirmRedeem = (customer) => {
+    if (!selectedReward || !customer) return;
+    if (customer.availablePoints < selectedReward.pointsRequired) {
+      alert(`Customer does not have enough points. Needs ${selectedReward.pointsRequired} points.`);
+      return;
+    }
+
+    const updatedBalances = loyaltyBalances.map((b) => {
+      if (b.id === customer.id) {
+        return {
+          ...b,
+          availablePoints: b.availablePoints - selectedReward.pointsRequired,
+          redeemedPoints: b.redeemedPoints + selectedReward.pointsRequired
+        };
+      }
+      return b;
+    });
+
+    const newRedemption = {
+      id: `RDM-${String(redemptions.length + 1).padStart(2, '0')}`,
+      customerName: customer.name,
+      customerMobile: customer.mobile,
+      rewardTitle: selectedReward.title,
+      pointsSpent: selectedReward.pointsRequired,
+      voucherCode: `${selectedReward.id}-${customer.mobile.slice(-4)}`,
+      date: new Date().toISOString().split('T')[0],
+      status: 'Redeemed'
+    };
+
+    setLoyaltyBalances(updatedBalances);
+    setRedemptions([newRedemption, ...redemptions]);
+    setIsRedeemModalOpen(false);
+    alert(`Reward "${selectedReward.title}" redeemed successfully for ${customer.name}!`);
+  };
+
+  const totalPointsCirculation = loyaltyBalances.reduce((sum, b) => sum + (b.availablePoints || 0), 0);
+  const totalRedeemed = loyaltyBalances.reduce((sum, b) => sum + (b.redeemedPoints || 0), 0);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Top Banner */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Award style={{ color: '#059669' }} /> Customer Loyalty & Reward Point Redemption
-          </h2>
-          <p style={{ color: '#6b7280', fontSize: '0.9rem', marginTop: '2px' }}>
-            Customer loyalty reward points ledger, catalog of service benefits, and instant voucher redemptions.
-          </p>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '12px' }}>
-        <button
+    <div style={{ animation: 'fadeIn 0.2s ease' }}>
+      {/* Sub Tabs */}
+      <div className="sub-tabs-container">
+        <span
+          className={`sub-tab ${activeSubTab === 'catalog' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('catalog')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 18px',
-            borderRadius: '8px',
-            fontSize: '0.9rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            backgroundColor: activeSubTab === 'catalog' ? '#059669' : '#ffffff',
-            color: activeSubTab === 'catalog' ? '#ffffff' : '#374151',
-            border: activeSubTab === 'catalog' ? '1px solid #059669' : '1px solid #e5e7eb'
-          }}
         >
-          <Gift size={18} /> Rewards Catalog
-        </button>
-
-        <button
+          <Gift size={14} style={{ marginRight: '6px' }} /> Rewards Catalog & Redemption
+        </span>
+        <span
+          className={`sub-tab ${activeSubTab === 'ledger' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('ledger')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 18px',
-            borderRadius: '8px',
-            fontSize: '0.9rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            backgroundColor: activeSubTab === 'ledger' ? '#059669' : '#ffffff',
-            color: activeSubTab === 'ledger' ? '#ffffff' : '#374151',
-            border: activeSubTab === 'ledger' ? '1px solid #059669' : '1px solid #e5e7eb'
-          }}
         >
-          <Coins size={18} /> Customer Points Ledger ({loyaltyBalances.length})
-        </button>
+          <Ticket size={14} style={{ marginRight: '6px' }} /> Redemption History Log
+        </span>
       </div>
 
-      {activeSubTab === 'catalog' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px' }}>
-          {rewardsCatalog.map(r => (
-            <div
-              key={r.id}
-              style={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: '12px',
-                padding: '22px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ fontSize: '2.25rem', lineHeight: 1 }}>{r.icon}</div>
-                  <span style={{
-                    backgroundColor: '#ecfdf5',
-                    color: '#059669',
-                    padding: '4px 10px',
-                    borderRadius: '16px',
-                    fontSize: '0.825rem',
-                    fontWeight: 700
-                  }}>
-                    {r.pointsRequired} Pts
-                  </span>
-                </div>
-
-                <div style={{ marginTop: '16px', fontWeight: 700, fontSize: '1.05rem', color: '#111827' }}>
-                  {r.title}
-                </div>
-
-                <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '6px', lineHeight: 1.5 }}>
-                  {r.description}
-                </p>
-              </div>
-
-              <div style={{ marginTop: '20px', paddingTop: '14px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: '0.85rem', color: '#4b5563' }}>
-                  Reward Value: <strong style={{ color: '#059669' }}>{r.value}</strong>
-                </div>
-
-                <button
-                  onClick={() => handleOpenRedeemModal(r)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 14px',
-                    borderRadius: '8px',
-                    backgroundColor: '#059669',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Ticket size={15} /> Redeem
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        /* Customer Loyalty Ledger */
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6' }}>
-            <div style={{ position: 'relative', width: '100%', maxWidth: '380px' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+      {/* 2-Column Master-Detail Layout */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1.2fr 1fr',
+          gap: '24px'
+        }}
+      >
+        {/* LEFT COLUMN: Customer Balances or Rewards Catalog */}
+        <div className="card">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <h3 className="card-title">
+              <Coins size={18} style={{ color: '#059669' }} /> Customer Loyalty Balances
+            </h3>
+            <div className="quick-search">
+              <Search size={14} className="quick-search-icon" />
               <input
                 type="text"
-                placeholder="Search customer name, mobile..."
+                placeholder="Search member..."
+                style={{ width: '160px', padding: '6px 10px 6px 28px', fontSize: '0.78rem' }}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px 8px 36px',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
               />
             </div>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: 600, fontSize: '0.8rem', textTransform: 'uppercase' }}>
-                <th style={{ padding: '12px 18px' }}>Customer Details</th>
-                <th style={{ padding: '12px 18px' }}>Total Lifetime Points</th>
-                <th style={{ padding: '12px 18px' }}>Points Redeemed</th>
-                <th style={{ padding: '12px 18px' }}>Available Balance</th>
-                <th style={{ padding: '12px 18px', textAlign: 'right' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredBalances.map(cust => (
-                <tr key={cust.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '14px 18px' }}>
-                    <div style={{ fontWeight: 600, color: '#111827' }}>{cust.name}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{cust.mobile}</div>
-                  </td>
-                  <td style={{ padding: '14px 18px', fontWeight: 600, color: '#4b5563' }}>
-                    {cust.totalPoints} Pts
-                  </td>
-                  <td style={{ padding: '14px 18px', color: '#ef4444', fontWeight: 500 }}>
-                    -{cust.redeemedPoints} Pts
-                  </td>
-                  <td style={{ padding: '14px 18px' }}>
-                    <span style={{
-                      backgroundColor: '#ecfdf5',
-                      color: '#059669',
-                      padding: '4px 12px',
-                      borderRadius: '12px',
-                      fontWeight: 700,
-                      fontSize: '0.9rem'
-                    }}>
-                      ⭐ {cust.availablePoints} Pts
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                    <span style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 600 }}>Active Member</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Redeem Voucher Modal */}
-      {isRedeemModalOpen && selectedReward && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000,
-          padding: '20px'
-        }}>
-          <div style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '16px',
-            maxWidth: '500px',
-            width: '100%',
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827' }}>Redeem Reward</h3>
-              <button onClick={() => setIsRedeemModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: '#9ca3af', cursor: 'pointer' }}>
-                &times;
-              </button>
+          <div className="card-body" style={{ maxHeight: '720px', overflowY: 'auto', padding: '12px' }}>
+            {/* Top Metric Summary Strip */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '8px',
+                backgroundColor: '#f9fafb',
+                padding: '10px',
+                borderRadius: '6px',
+                border: '1px solid #e5e7eb',
+                marginBottom: '10px',
+                textAlign: 'center'
+              }}
+            >
+              <div>
+                <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Active Members</span>
+                <strong style={{ fontSize: '0.9rem', color: '#1f2937' }}>{loyaltyBalances.length}</strong>
+              </div>
+              <div>
+                <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>⭐ In Circulation</span>
+                <strong style={{ fontSize: '0.9rem', color: '#059669' }}>{totalPointsCirculation} Pts</strong>
+              </div>
+              <div>
+                <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>🎟️ Redeemed</span>
+                <strong style={{ fontSize: '0.9rem', color: '#3b82f6' }}>{totalRedeemed} Pts</strong>
+              </div>
             </div>
 
-            <form onSubmit={handleProcessRedeem} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ backgroundColor: '#fafdfb', padding: '16px', borderRadius: '10px', border: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ fontSize: '2rem' }}>{selectedReward.icon}</div>
-                <div>
-                  <div style={{ fontWeight: 700, color: '#111827' }}>{selectedReward.title}</div>
-                  <div style={{ fontSize: '0.85rem', color: '#059669', fontWeight: 600 }}>Cost: {selectedReward.pointsRequired} Reward Points</div>
-                </div>
-              </div>
+            {/* List of Member Balances */}
+            {filteredBalances && filteredBalances.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {filteredBalances.map((cust) => {
+                  const isSelected = activeCustomer && activeCustomer.id === cust.id;
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Select Customer *</label>
-                <select
-                  value={selectedCustomerId}
-                  onChange={(e) => setSelectedCustomerId(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}
-                >
-                  {loyaltyBalances.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.mobile}) - Balance: {c.availablePoints} Pts
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  return (
+                    <div
+                      key={cust.id}
+                      onClick={() => setSelectedCustomerId(cust.id)}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        border: isSelected ? '2px solid #059669' : '1px solid #e5e7eb',
+                        backgroundColor: isSelected ? '#f0fdf4' : '#ffffff',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        boxShadow: isSelected ? '0 2px 4px rgba(5, 150, 105, 0.1)' : 'none'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: '50%',
+                              backgroundColor: isSelected ? '#a7f3d0' : '#fef3c7',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: '0.75rem',
+                              color: isSelected ? '#047857' : '#b45309'
+                            }}
+                          >
+                            {(cust.name || 'C').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <strong style={{ fontSize: '0.88rem', color: '#1f2937' }}>{cust.name}</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#6b7280', marginLeft: '6px' }}>#{cust.id}</span>
+                          </div>
+                        </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-                <button
-                  type="button"
-                  onClick={() => setIsRedeemModalOpen(false)}
-                  style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: '#ffffff', color: '#4b5563', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{ padding: '10px 22px', borderRadius: '8px', border: 'none', backgroundColor: '#059669', color: '#ffffff', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Confirm Redemption
-                </button>
+                        <span
+                          style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: '#ecfdf5',
+                            color: '#059669',
+                            border: '1px solid #bbf7d0'
+                          }}
+                        >
+                          ⭐ {cust.availablePoints} Pts
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#6b7280', marginTop: '4px' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Phone size={11} color="#059669" /> {cust.mobile}
+                        </span>
+                        <span>Total Earned: {cust.totalPoints} Pts</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </form>
+            ) : (
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: '#9ca3af' }}>
+                <Coins size={36} strokeWidth={1} style={{ marginBottom: '8px' }} />
+                <p style={{ fontSize: '0.82rem' }}>No customer loyalty records found.</p>
+              </div>
+            )}
           </div>
         </div>
-      )}
+
+        {/* RIGHT COLUMN: Customer Loyalty Pass & Rewards Voucher Preview */}
+        <div className="card">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="card-title">
+              <Sparkles size={18} style={{ color: '#059669' }} /> Customer Loyalty Pass
+            </h3>
+            {activeCustomer && (
+              <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                Pass #{activeCustomer.id}
+              </span>
+            )}
+          </div>
+
+          <div className="card-body">
+            {activeCustomer ? (
+              <div className="invoice-container">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #059669', paddingBottom: '12px' }}>
+                  <div>
+                    <div className="invoice-title" style={{ textAlign: 'left', margin: 0, fontSize: '1.25rem' }}>NANDHI MOTORS</div>
+                    <p style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 600, margin: '2px 0 0' }}>
+                      Exclusive Two-Wheeler Loyalty & Privilege Pass
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span
+                      className="badge"
+                      style={{
+                        backgroundColor: '#f59e0b',
+                        color: '#fff',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700
+                      }}
+                    >
+                      👑 GOLD MEMBER
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2-Column Info Grid */}
+                <div className="invoice-grid-2" style={{ marginTop: '16px' }}>
+                  <div>
+                    <div className="section-title">Member Particulars</div>
+                    <p><strong>Name:</strong> {activeCustomer.name}</p>
+                    <p>
+                      <strong>Mobile:</strong>{' '}
+                      <a href={`tel:${activeCustomer.mobile}`} style={{ color: '#059669', fontWeight: 600, textDecoration: 'none' }}>
+                        {activeCustomer.mobile}
+                      </a>
+                    </p>
+                    <p><strong>Member ID:</strong> {activeCustomer.id}</p>
+                  </div>
+
+                  <div>
+                    <div className="section-title">Points Summary</div>
+                    <p><strong>Available Balance:</strong> <span style={{ fontSize: '1rem', fontWeight: 700, color: '#059669' }}>{activeCustomer.availablePoints} Points</span></p>
+                    <p><strong>Lifetime Points:</strong> {activeCustomer.totalPoints} Points</p>
+                    <p><strong>Redeemed:</strong> {activeCustomer.redeemedPoints} Points</p>
+                  </div>
+                </div>
+
+                {/* Available Rewards Redemption Grid */}
+                <div style={{ marginTop: '16px' }}>
+                  <div className="section-title">Claimable Service & Accessory Rewards</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                    {rewardsCatalog.map((reward) => {
+                      const canRedeem = activeCustomer.availablePoints >= reward.pointsRequired;
+
+                      return (
+                        <div
+                          key={reward.id}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid #e5e7eb',
+                            backgroundColor: canRedeem ? '#f0fdf4' : '#f9fafb',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '1.25rem' }}>{reward.icon}</span>
+                            <div>
+                              <strong style={{ fontSize: '0.84rem', color: '#1f2937' }}>{reward.title}</strong>
+                              <p style={{ margin: 0, fontSize: '0.72rem', color: '#6b7280' }}>
+                                Worth {reward.value} • Requires {reward.pointsRequired} Pts
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            className={`btn btn-sm ${canRedeem ? 'btn-primary' : 'btn-secondary'}`}
+                            disabled={!canRedeem}
+                            style={{ fontSize: '0.74rem', padding: '4px 10px', opacity: canRedeem ? 1 : 0.5 }}
+                            onClick={() => handleConfirmRedeem(activeCustomer)}
+                          >
+                            {canRedeem ? 'Claim Reward' : 'Needs More Pts'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: '#9ca3af' }}>
+                <Coins size={36} strokeWidth={1} style={{ marginBottom: '8px' }} />
+                <p>Select a member from the loyalty ledger on the left to preview.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -30,7 +30,8 @@ export default function VehicleServicePage({
   setServiceBills,
   spares = [],
   showPreviews = true,
-  customers = []
+  customers = [],
+  companyProfile = {}
 }) {
   const [printModalConfig, setPrintModalConfig] = useState({ isOpen: false, type: 'jobsheet', data: null });
 
@@ -48,6 +49,8 @@ export default function VehicleServicePage({
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [historyTypeFilter, setHistoryTypeFilter] = useState('ALL');
   const [historyDateFilter, setHistoryDateFilter] = useState('ALL');
+  const [historyStartDate, setHistoryStartDate] = useState('');
+  const [historyEndDate, setHistoryEndDate] = useState('');
 
   // Job Sheet Form State
   const [formData, setFormData] = useState({
@@ -114,6 +117,23 @@ export default function VehicleServicePage({
       const parts = (bill.date || '').split('/');
       if (parts.length === 3) {
         matchDate = parseInt(parts[1], 10) === currentMonth + 1 && parseInt(parts[2], 10) === currentYear;
+      }
+    } else if (historyDateFilter === 'CUSTOM') {
+      if (historyStartDate || historyEndDate) {
+        const parts = (bill.date || '').split('/');
+        if (parts.length === 3) {
+          const billDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          if (historyStartDate) {
+            const start = new Date(historyStartDate);
+            start.setHours(0,0,0,0);
+            if (billDate < start) matchDate = false;
+          }
+          if (historyEndDate) {
+            const end = new Date(historyEndDate);
+            end.setHours(23,59,59,999);
+            if (billDate > end) matchDate = false;
+          }
+        }
       }
     }
 
@@ -204,41 +224,12 @@ export default function VehicleServicePage({
   // Standard labor work presets (Item 10)
   const handleServiceWorkChange = (workType) => {
     setSelectedServiceWork(workType);
-    let defaultDesc = workType;
-    let defaultAmt = 350;
+    
+    const laborTypes = companyProfile?.serviceLaborTypes || [];
+    const matchedType = laborTypes.find(lt => lt.type === workType);
 
-    switch (workType) {
-      case '1st Free Service':
-      case '2nd Free Service':
-      case '3rd Free Service':
-        defaultDesc = `${workType} Periodic Checkup`;
-        defaultAmt = 0;
-        break;
-      case 'General Service':
-        defaultDesc = 'General Periodic Service & Washing';
-        defaultAmt = 350;
-        break;
-      case 'Paid Periodic Maintenance Service':
-        defaultDesc = 'Paid Periodic Maintenance Service (PMS)';
-        defaultAmt = 450;
-        break;
-      case 'Major Overhaul / Engine Repair':
-        defaultDesc = 'Major Engine / Motor Transmission Overhaul';
-        defaultAmt = 1200;
-        break;
-      case 'Electrical & Battery Diagnostics':
-        defaultDesc = 'Electrical Wiring & Battery Health Check';
-        defaultAmt = 250;
-        break;
-      case 'Brake, Chain & Suspension Overhaul':
-        defaultDesc = 'Brake Shoes, Chain Sprocket & Suspension Work';
-        defaultAmt = 350;
-        break;
-      default:
-        defaultDesc = 'Service Work Labor';
-        defaultAmt = 300;
-        break;
-    }
+    let defaultDesc = matchedType ? matchedType.desc : 'Service Work Labor';
+    let defaultAmt = matchedType ? Number(matchedType.amount || 0) : 300;
 
     setLaborItems(prev => {
       if (prev.length === 0) return [{ desc: defaultDesc, amount: defaultAmt }];
@@ -900,14 +891,11 @@ export default function VehicleServicePage({
                   value={selectedServiceWork}
                   onChange={(e) => handleServiceWorkChange(e.target.value)}
                 >
-                  <option value="General Service">General Service (Base ₹350)</option>
-                  <option value="1st Free Service">1st Free Service (Labor ₹0)</option>
-                  <option value="2nd Free Service">2nd Free Service (Labor ₹0)</option>
-                  <option value="3rd Free Service">3rd Free Service (Labor ₹0)</option>
-                  <option value="Paid Periodic Maintenance Service">Paid Periodic Service (Base ₹450)</option>
-                  <option value="Major Overhaul / Engine Repair">Major Overhaul / Engine Repair (Base ₹1,200)</option>
-                  <option value="Electrical & Battery Diagnostics">Electrical & Battery Diagnostics (Base ₹250)</option>
-                  <option value="Brake, Chain & Suspension Overhaul">Brake & Suspension Overhaul (Base ₹350)</option>
+                  {(companyProfile?.serviceLaborTypes || []).map((lt) => (
+                    <option key={lt.id} value={lt.type}>
+                      {lt.type} (Base ₹{lt.amount})
+                    </option>
+                  ))}
                   <option value="Custom Labor">Custom Labor Work</option>
                 </select>
               </div>
@@ -930,7 +918,7 @@ export default function VehicleServicePage({
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="e.g. Engine Oil Service, Brake Pad Labor"
+                      
                       required
                       value={item.desc}
                       onChange={(e) => {
@@ -944,7 +932,7 @@ export default function VehicleServicePage({
                     <input
                       type="number"
                       className="form-control"
-                      placeholder="Amount (₹)"
+                      
                       required
                       min="0"
                       value={item.amount}
@@ -1024,7 +1012,7 @@ export default function VehicleServicePage({
                         <input
                           type="number"
                           className="form-control"
-                          placeholder="Price (₹)"
+                          
                           required
                           value={item.price}
                           onChange={(e) => {
@@ -1038,7 +1026,7 @@ export default function VehicleServicePage({
                         <input
                           type="number"
                           className="form-control"
-                          placeholder="Qty"
+                          
                           required
                           min="1"
                           value={item.qty}
@@ -1106,7 +1094,7 @@ export default function VehicleServicePage({
                   <input
                     type="number"
                     className="form-control"
-                    placeholder="Enter discount"
+                    
                     min="0"
                     value={discount}
                     onChange={(e) => setDiscount(Number(e.target.value))}
@@ -1236,7 +1224,28 @@ export default function VehicleServicePage({
                 <option value="ALL">All Dates</option>
                 <option value="TODAY">Today</option>
                 <option value="MONTH">This Month</option>
+                <option value="CUSTOM">Custom Range</option>
               </select>
+
+              {historyDateFilter === 'CUSTOM' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <input
+                    type="date"
+                    className="form-control"
+                    style={{ padding: '2px 6px', fontSize: '0.78rem' }}
+                    value={historyStartDate}
+                    onChange={(e) => setHistoryStartDate(e.target.value)}
+                  />
+                  <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>to</span>
+                  <input
+                    type="date"
+                    className="form-control"
+                    style={{ padding: '2px 6px', fontSize: '0.78rem' }}
+                    value={historyEndDate}
+                    onChange={(e) => setHistoryEndDate(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
 
             {(historySearchQuery || historyTypeFilter !== 'ALL' || historyDateFilter !== 'ALL') && (
@@ -1248,6 +1257,8 @@ export default function VehicleServicePage({
                   setHistorySearchQuery('');
                   setHistoryTypeFilter('ALL');
                   setHistoryDateFilter('ALL');
+                  setHistoryStartDate('');
+                  setHistoryEndDate('');
                 }}
               >
                 Reset Filters
@@ -1613,7 +1624,7 @@ export default function VehicleServicePage({
                     inputMode="numeric"
                     maxLength={10}
                     className="form-control"
-                    placeholder="10-digit mobile number"
+                    
                     required
                     pattern="[0-9]{10}"
                     value={formData.customerMobile}
@@ -1629,7 +1640,7 @@ export default function VehicleServicePage({
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="e.g. TN-37-BJ-5120"
+                    
                     style={{ textTransform: 'uppercase' }}
                     required
                     value={formData.vehicleNo}
@@ -1641,7 +1652,7 @@ export default function VehicleServicePage({
                   <input
                     type="number"
                     className="form-control"
-                    placeholder="e.g. 15400"
+                    
                     required
                     min="0"
                     value={formData.vehicleKm}
@@ -1682,7 +1693,7 @@ export default function VehicleServicePage({
                 <label className="form-label">Customer Complaints / Action Items *</label>
                 <textarea
                   className="form-control"
-                  placeholder="Describe specific complaints (e.g. 1. Engine noise; 2. Rear break check; 3. General wash)"
+                  
                   required
                   rows="4"
                   style={{ resize: 'vertical', fontFamily: 'inherit', padding: '10px' }}

@@ -6,7 +6,7 @@ import LeadsManagement from './components/pages/LeadsManagement';
 import CustomersPage from './components/pages/CustomersPage';
 import VehicleListPage from './components/pages/VehicleListPage';
 import SpareInventoryPage from './components/pages/SpareInventoryPage';
-import SettingsPage from './components/pages/SettingsPage';
+import SettingsPage, { DEFAULT_SERVICE_LABOR_TYPES } from './components/pages/SettingsPage';
 import VehicleServicePage from './components/pages/VehicleServicePage';
 import AccountingLedgerPage from './components/pages/AccountingLedgerPage';
 import PurchasePage from './components/pages/PurchasePage';
@@ -26,143 +26,119 @@ export default function App() {
 
   // Shared Leads Database with localStorage Persistence
   const [leads, setLeads] = useState(() => {
-    const saved = localStorage.getItem('nandhi_leads');
-    return saved ? JSON.parse(saved) : [
-      { id: 'L-01', name: 'Rajesh Kumar', mobile: '9842155670', vehicle: 'Honda Activa 6G', status: 'Hot', leadType: 'Hot', sourceType: 'Walk-In', executive: 'Suresh Kumar', createdOn: '14/08/2026' },
-      { id: 'L-02', name: 'Priya Dharshini', mobile: '9443219800', vehicle: 'Honda Shine 125', status: 'Warm', leadType: 'Warm', sourceType: 'Digital / Web', executive: 'Ramesh Babu', createdOn: '13/08/2026' }
-    ];
+    const saved = localStorage.getItem('nandhi_app_leads');
+    return saved ? JSON.parse(saved) : [];
   });
 
   // Shared Customers Database with localStorage Persistence
   const [customers, setCustomers] = useState(() => {
-    const saved = localStorage.getItem('nandhi_customers');
-    return saved ? JSON.parse(saved) : [
-      { id: 'C-01', name: 'Rajesh Kumar', mobile: '9842155670', vehicleModel: 'Honda Activa 6G', registeredOn: '14/08/2026', source: 'Walk-In' },
-      { id: 'C-02', name: 'Priya Dharshini', mobile: '9443219800', vehicleModel: 'Honda Shine 125', registeredOn: '13/08/2026', source: 'Digital / Web' }
-    ];
+    const saved = localStorage.getItem('nandhi_app_customers');
+    return saved ? JSON.parse(saved) : [];
   });
 
   // Shared Spares Database with localStorage Persistence
   const [spares, setSpares] = useState(() => {
-    const saved = localStorage.getItem('nandhi_spares');
-    return saved ? JSON.parse(saved) : [
-      { id: 'SP-01', name: 'Engine Oil 4T 10W30 (1L)', partNo: 'OIL-4T-10W30', category: 'Lubricants', stock: 48, minStock: 15, unitPrice: 380, location: 'Rack A-1' },
-      { id: 'SP-02', name: 'Brake Shoe Set Activa 6G', partNo: 'BS-ACT-6G', category: 'Brakes', stock: 24, minStock: 10, unitPrice: 280, location: 'Rack B-2' },
-      { id: 'SP-03', name: 'Spark Plug CPR8EA-9', partNo: 'SP-CPR8EA', category: 'Electricals', stock: 8, minStock: 12, unitPrice: 160, location: 'Rack C-1' }
-    ];
+    const saved = localStorage.getItem('nandhi_app_spares');
+    return saved ? JSON.parse(saved) : [];
   });
 
   // Shared Invoices Database with localStorage Persistence
   const [invoices, setInvoices] = useState(() => {
-    const saved = localStorage.getItem('nandhi_invoices');
-    return saved ? JSON.parse(saved) : [
-      { invoiceNo: '01', customerName: 'Rajesh Kumar', customerPhone: '9842155670', customerAddress: '12, Gandhi Nagar, Namakkal', customerAadhar: '9821-4412-9901', customerGst: '33AAAAA0000A1Z5', vehicleModel: 'Honda Activa 6G', vehicleColor: 'Matte Blue', vinNumber: 'ME4JF911NK00892', engineNo: 'JF91E918231', batteryNumber: 'BAT-2026-NANDHI', chargerNumber: 'CHG-9921', controllerNumber: 'CTRL-8812', exShowroom: 82000, gstRate: 5, gstAmount: 4100, insurance: 6200, rto: 10400, subsidy: 0, discount: 0, totalBeforeRoundoff: 102700, grandTotal: 102700, paymentStatus: 'Fully Paid', invoiceDate: '14/08/2026' }
-    ];
+    const saved = localStorage.getItem('nandhi_app_invoices');
+    return saved ? JSON.parse(saved) : [];
   });
 
   // Shared Quotations Database with localStorage Persistence
   const [quotations, setQuotations] = useState(() => {
-    const saved = localStorage.getItem('nandhi_quotations');
-    return saved ? JSON.parse(saved) : [
-      { quoteId: 'QT-01', customerName: 'Rajesh Kumar', customerPhone: '9842155670', vehicleModel: 'Honda Activa 6G', vehicleColor: 'Matte Blue', exShowroom: 82000, rto: 10400, insurance: 6200, accessories: 1500, handling: 0, discount: 1000, total: 99100, createdOn: '14/08/2026' }
-    ];
+    const saved = localStorage.getItem('nandhi_app_quotations');
+    return saved ? JSON.parse(saved) : [];
   });
 
   // Shared Vehicles Directory with localStorage Persistence
   const [vehicles, setVehicles] = useState(() => {
-    const saved = localStorage.getItem('nandhi_vehicles');
-    return saved ? JSON.parse(saved) : [
-      { id: 'VEH-01', brand: 'Honda', model: 'Activa 6G', color: 'Matte Blue', hsnCode: '87112029', price: 82000 },
-      { id: 'VEH-02', brand: 'Honda', model: 'Shine 125', color: 'Black', hsnCode: '87112029', price: 89000 },
-      { id: 'VEH-03', brand: 'Honda', model: 'SP 125', color: 'Imperial Red', hsnCode: '87112029', price: 92000 }
-    ];
+    const saved = localStorage.getItem('nandhi_app_vehicles');
+    return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
-    localStorage.setItem('nandhi_leads', JSON.stringify(leads));
+    localStorage.setItem('nandhi_app_leads', JSON.stringify(leads));
   }, [leads]);
 
   useEffect(() => {
-    localStorage.setItem('nandhi_customers', JSON.stringify(customers));
+    localStorage.setItem('nandhi_app_customers', JSON.stringify(customers));
   }, [customers]);
 
   useEffect(() => {
-    localStorage.setItem('nandhi_spares', JSON.stringify(spares));
+    localStorage.setItem('nandhi_app_spares', JSON.stringify(spares));
   }, [spares]);
 
   useEffect(() => {
-    localStorage.setItem('nandhi_invoices', JSON.stringify(invoices));
+    localStorage.setItem('nandhi_app_invoices', JSON.stringify(invoices));
   }, [invoices]);
 
   useEffect(() => {
-    localStorage.setItem('nandhi_quotations', JSON.stringify(quotations));
+    localStorage.setItem('nandhi_app_quotations', JSON.stringify(quotations));
   }, [quotations]);
 
   useEffect(() => {
-    localStorage.setItem('nandhi_vehicles', JSON.stringify(vehicles));
+    localStorage.setItem('nandhi_app_vehicles', JSON.stringify(vehicles));
   }, [vehicles]);
 
   // Shared Job Sheets Database
   const [jobSheets, setJobSheets] = useState(() => {
-    const saved = localStorage.getItem('nandhi_jobsheets');
-    return saved ? JSON.parse(saved) : [
-      { id: 'JS-01', customerName: 'Rajesh Kumar', vehicleNo: 'TN-37-BJ-5120', vehicleKm: '12400', complaints: '1. Odometer console flicker\n2. Front suspension noise\n3. General water wash', serviceType: 'Paid Service', status: 'In Progress', billingStatus: 'Unbilled', date: '14/08/2026' },
-      { id: 'JS-02', customerName: 'Deepak Sharma', vehicleNo: 'TN-45-AS-9821', vehicleKm: '8200', complaints: '1. First free service checkup\n2. Battery voltage testing', serviceType: 'Free Service', status: 'Ready', billingStatus: 'Unbilled', date: '13/08/2026' }
-    ];
+    const saved = localStorage.getItem('nandhi_app_jobsheets');
+    return saved ? JSON.parse(saved) : [];
   });
 
   // Shared Service Bills Database
   const [serviceBills, setServiceBills] = useState(() => {
-    const saved = localStorage.getItem('nandhi_service_bills');
-    return saved ? JSON.parse(saved) : [
-      { id: 'SB-01', jobSheetId: 'JS-01', customerName: 'Sanjay Kumar', vehicleNo: 'TN-37-BJ-5120', serviceType: 'Paid Service', laborItems: [{ desc: 'General Labor', amount: 350 }], parts: [{ id: 'SP-01', name: 'Brake Shoe Set Activa 6G', price: 280, qty: 1 }], subtotal: 630, gst: 32, discount: 0, roundOff: -2, grandTotal: 660, date: '12/08/2026' }
-    ];
+    const saved = localStorage.getItem('nandhi_app_service_bills');
+    return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
-    localStorage.setItem('nandhi_jobsheets', JSON.stringify(jobSheets));
+    localStorage.setItem('nandhi_app_jobsheets', JSON.stringify(jobSheets));
   }, [jobSheets]);
 
   useEffect(() => {
-    localStorage.setItem('nandhi_service_bills', JSON.stringify(serviceBills));
+    localStorage.setItem('nandhi_app_service_bills', JSON.stringify(serviceBills));
   }, [serviceBills]);
 
   // Shared Daily Expenses Database
   const [dailyExpenses, setDailyExpenses] = useState(() => {
-    const saved = localStorage.getItem('nandhi_daily_expenses');
-    return saved ? JSON.parse(saved) : [
-      { id: 'EXP-01', category: 'Rent', amount: 15000, payee: 'Showroom Owner', date: '2026-08-01', paymentMode: 'Bank Transfer', notes: 'Monthly Showroom Rent' },
-      { id: 'EXP-02', category: 'Electricity', amount: 3450, payee: 'TNEB Electricity Board', date: '2026-08-05', paymentMode: 'UPI', notes: 'Electricity bill for July' },
-      { id: 'EXP-03', category: 'Snacks', amount: 450, payee: 'Sri Krishna Tea Stall', date: '2026-08-14', paymentMode: 'Cash', notes: 'Staff & customer refreshments' }
-    ];
+    const saved = localStorage.getItem('nandhi_app_daily_expenses');
+    return saved ? JSON.parse(saved) : [];
   });
 
   // Shared Purchase Invoices Database
   const [purchaseInvoices, setPurchaseInvoices] = useState(() => {
-    const saved = localStorage.getItem('nandhi_purchase_invoices');
-    return saved ? JSON.parse(saved) : [
-      { id: 'PUR-01', purchaseType: 'Vehicle Purchases', supplierName: 'Honda Motorcycle & Scooter India', supplierGst: '33AABCH1234F1Z5', invoiceNo: 'HMSI-INV-9921', date: '2026-08-02', itemDetails: '5x Honda Activa 6G (Black)', qty: 5, unitPrice: 75000, gstRate: 5, gstAmount: 18750, totalAmount: 393750 },
-      { id: 'PUR-02', purchaseType: 'Spare Purchases', supplierName: 'Anand Auto Spares Co', supplierGst: '33AABCA9876E1Z1', invoiceNo: 'AAS-8812', date: '2026-08-08', itemDetails: '20x Brake Shoe Set Activa 6G', qty: 20, unitPrice: 220, gstRate: 18, gstAmount: 792, totalAmount: 5192 }
-    ];
+    const saved = localStorage.getItem('nandhi_app_purchase_invoices');
+    return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
-    localStorage.setItem('nandhi_daily_expenses', JSON.stringify(dailyExpenses));
+    localStorage.setItem('nandhi_app_daily_expenses', JSON.stringify(dailyExpenses));
   }, [dailyExpenses]);
 
   useEffect(() => {
-    localStorage.setItem('nandhi_purchase_invoices', JSON.stringify(purchaseInvoices));
+    localStorage.setItem('nandhi_app_purchase_invoices', JSON.stringify(purchaseInvoices));
   }, [purchaseInvoices]);
 
   // Shared Preview Configurations for Pages
   const [showPreviews, setShowPreviews] = useState(() => {
-    const saved = localStorage.getItem('nandhi_show_previews');
-    return saved !== null ? JSON.parse(saved) : true;
+    try {
+      const saved = localStorage.getItem('nandhi_app_show_previews');
+      if (saved === 'false') return false;
+      if (saved === 'true') return true;
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch (e) {
+      return true;
+    }
   });
 
   // Shared Company Profile State
   const [companyProfile, setCompanyProfile] = useState(() => {
-    const saved = localStorage.getItem('nandhi_company_profile');
+    const saved = localStorage.getItem('nandhi_app_company_profile');
     return saved ? JSON.parse(saved) : {
       name: 'NANDHI MOTORS',
       tagline: 'Authorized Two-Wheeler Sales, Genuine Spares & Service Dealership',
@@ -179,16 +155,21 @@ export default function App() {
       accountNumber: '50200088991234',
       ifscCode: 'HDFC0001234',
       branch: 'Namakkal Main Branch',
-      upiId: 'nandhimotors@hdfcbank'
+      upiId: 'nandhimotors@hdfcbank',
+      quotationTerms: `1. Prices quoted are valid for 7 days from the date of issuance and subject to manufacturer revision.
+2. Final delivery is subject to vehicle color and model stock availability.
+3. RTO registration, Road Tax & Insurance charges are subject to statutory revisions by Government authorities.
+4. Full on-road payment is required prior to vehicle invoicing and registration dispatch.
+5. Standard accessories & helmet are supplied per dealership delivery policy.`
     };
   });
 
   useEffect(() => {
-    localStorage.setItem('nandhi_company_profile', JSON.stringify(companyProfile));
+    localStorage.setItem('nandhi_app_company_profile', JSON.stringify(companyProfile));
   }, [companyProfile]);
 
   useEffect(() => {
-    localStorage.setItem('nandhi_show_previews', JSON.stringify(showPreviews));
+    localStorage.setItem('nandhi_app_show_previews', JSON.stringify(showPreviews));
   }, [showPreviews]);
 
   // Fetch initial data from backend on mount (MERGE WITHOUT OVERWRITING USER DATA)
@@ -857,22 +838,14 @@ export default function App() {
 
   // System Stats for Dashboard Overview
   const [stats, setStats] = useState({
-    leadsToday: 8,
-    activeServices: 14,
-    lowStockCount: 2,
-    revenueToday: 42500
+    leadsToday: 0,
+    activeServices: 0,
+    lowStockCount: 0,
+    revenueToday: 0
   });
 
   // Recent Activity Feed for Dashboard
-  const [activities, setActivities] = useState([
-    { id: 1, text: 'Low Stock Alert: Brake Shoe Set Activa 6G (8 remaining)', priority: 'medium', time: '10 mins ago' },
-    { id: 2, text: 'Low Stock Alert: Air Filter Honda Shine (3 remaining)', priority: 'high', time: '25 mins ago' },
-    { id: 3, text: "New lead 'Sanjay Kumar' registered for Honda Activa 6G", priority: 'low', time: '1 hour ago' },
-    { id: 4, text: 'Job Sheet JS-983 marked completed for TN-37-BJ-5120', priority: 'low', time: '2 hours ago' }
-  ]);
-
-  // Alert Count Badge
-  const [alertCount, setAlertCount] = useState(2);
+  const [activities, setActivities] = useState([]);
 
   // Quick helper to change tabs
   const handleTabChange = (tab, subTab = null) => {
@@ -950,6 +923,22 @@ export default function App() {
     );
   };
 
+  // Dynamic alert count for Header Notification Badge
+  const alertCount = React.useMemo(() => {
+    const lowStock = spares.filter(s => Number(s.stock || s.qty || 0) <= Number(s.minStock || 5)).length;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const followupsDue = leads.filter(l => {
+      if (l.reminder === 'OFF' || !l.followupDate) return false;
+      let compDate = l.followupDate;
+      if (l.followupDate.includes('/')) {
+        const p = l.followupDate.split('/');
+        if (p.length === 3) compDate = `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+      }
+      return compDate <= todayStr;
+    }).length;
+    return lowStock + followupsDue;
+  }, [spares, leads]);
+
   return (
     <div className="app-container">
       {/* 1. Sidebar Navigation */}
@@ -1000,6 +989,8 @@ export default function App() {
               quotations={quotations}
               addQuotation={addQuotation}
               deleteQuotation={deleteQuotation}
+              companyProfile={companyProfile}
+              customers={customers}
             />
           ) : activeTab === 'service' ? (
             <VehicleServicePage
@@ -1012,11 +1003,19 @@ export default function App() {
               spares={spares}
               showPreviews={showPreviews}
               customers={customers}
+              companyProfile={{
+                ...companyProfile,
+                serviceLaborTypes: companyProfile?.serviceLaborTypes?.length > 0 
+                  ? companyProfile.serviceLaborTypes 
+                  : DEFAULT_SERVICE_LABOR_TYPES
+              }}
             />
-          ) : activeTab === 'management' && activeSubTab === 'settings' ? (
+          ) : activeTab === 'settings' ? (
             <SettingsPage
               showPreviews={showPreviews}
               setShowPreviews={setShowPreviews}
+              companyProfile={companyProfile}
+              setCompanyProfile={handleSetCompanyProfile}
             />
           ) : activeTab === 'management' && activeSubTab === 'customers' ? (
             <CustomersPage
@@ -1032,6 +1031,7 @@ export default function App() {
             <SpareInventoryPage
               spares={spares}
               setSpares={handleSetSpares}
+              showPreviews={showPreviews}
             />
           ) : activeTab === 'purchase' ? (
             <PurchasePage
@@ -1042,16 +1042,28 @@ export default function App() {
               spares={spares}
               setSpares={handleSetSpares}
               vehicles={vehicles}
+              showPreviews={showPreviews}
             />
           ) : activeTab === 'accounting' ? (
             <AccountingLedgerPage
               activeSubTab={activeSubTab}
               setActiveSubTab={setActiveSubTab}
               invoices={invoices}
+              setInvoices={setInvoices}
+              addInvoice={addInvoice}
               serviceBills={serviceBills}
+              setServiceBills={handleSetServiceBills}
+              jobSheets={jobSheets}
+              setJobSheets={handleSetJobSheets}
               dailyExpenses={dailyExpenses}
               setDailyExpenses={handleSetDailyExpenses}
               purchaseInvoices={purchaseInvoices}
+              setPurchaseInvoices={handleSetPurchaseInvoices}
+              spares={spares}
+              vehicles={vehicles}
+              customers={customers}
+              companyProfile={companyProfile}
+              onNavigate={handleTabChange}
             />
           ) : activeTab === 'warranty' ? (
             <WarrantyClaimPage
@@ -1068,6 +1080,8 @@ export default function App() {
               serviceBills={serviceBills}
               customers={customers}
               leads={leads}
+              updateLead={updateLead}
+              setLeads={handleSetLeads}
               onNavigate={handleTabChange}
             />
           ) : activeTab === 'management' && activeSubTab === 'birthday' ? (

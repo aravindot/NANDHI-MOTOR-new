@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Search, Phone, CheckCircle, Trash2, Calendar, Clipboard, Calculator, Printer, FileCode, Edit2, MessageCircle, BarChart3, Download, Filter, TrendingUp, DollarSign, FileDown, FileText } from 'lucide-react';
+import { UserPlus, Search, Phone, CheckCircle, Trash2, Calendar, Clipboard, Calculator, Printer, FileCode, Edit2, MessageCircle, BarChart3, Download, Filter, TrendingUp, DollarSign, FileDown, FileText, Bell, BellOff, Clock, AlertTriangle, AlertCircle, Receipt, ArrowRight, SlidersHorizontal, RotateCcw, Users, FileSpreadsheet, Layers, PieChart, CheckCheck, ArrowUpRight } from 'lucide-react';
 import PrintPreviewModal from '../PrintPreviewModal';
 import { generateQuotationPdfAndShare, generateInvoicePdfAndShare } from '../../utils/pdfShareUtil';
 import { API_BASE_URL } from '../../config/api';
@@ -20,33 +20,23 @@ export default function LeadsManagement({
   deleteInvoice,
   quotations = [],
   addQuotation,
-  deleteQuotation
+  deleteQuotation,
+  companyProfile,
+  customers = []
 }) {
   const [printModalConfig, setPrintModalConfig] = useState({ isOpen: false, type: 'invoice', data: null });
 
   // Dynamic Vehicle Data Registry for Dropdowns built from active database list
   const vehicleList = React.useMemo(() => {
-    const activeVehicles = vehicles && vehicles.length > 0 ? vehicles : [
-      { id: 'VEH-01', brand: 'Honda', model: 'Activa 6G', color: 'Blue', hsnCode: '87112029' },
-      { id: 'VEH-02', brand: 'Honda', model: 'Shine 125', color: 'Black', hsnCode: '87112029' },
-      { id: 'VEH-03', brand: 'Honda', model: 'SP 125', color: 'Red', hsnCode: '87112029' }
-    ];
+    const activeVehicles = vehicles || [];
 
     const grouped = {};
     activeVehicles.forEach(v => {
       const name = `${v.brand} ${v.model}`;
       if (!grouped[name]) {
-        const staticMatch = [
-          { name: 'Honda Activa 6G', basePrice: 82000 },
-          { name: 'Honda Shine 125', basePrice: 89000 },
-          { name: 'Honda SP 125', basePrice: 94000 },
-          { name: 'Honda Unicorn 160', basePrice: 115000 },
-          { name: 'Honda Hornet 2.0', basePrice: 145000 }
-        ].find(s => s.name.toLowerCase() === name.toLowerCase());
-
         grouped[name] = {
           name,
-          basePrice: staticMatch ? staticMatch.basePrice : 85000,
+          basePrice: v.price || 85000,
           colors: new Set()
         };
       }
@@ -85,6 +75,35 @@ export default function LeadsManagement({
   const [leadSuccessMsg, setLeadSuccessMsg] = useState('');
   const [leadStatusFilter, setLeadStatusFilter] = useState('ALL');
   const [leadTempFilter, setLeadTempFilter] = useState('ALL');
+  const [leadReminderFilter, setLeadReminderFilter] = useState('ALL'); // 'ALL' | 'REMINDER_ON' | 'DUE_TODAY' | 'OVERDUE' | 'REMINDER_OFF'
+
+  // Helper for followup status calculation
+  const getFollowupStatus = (followupDate, reminder) => {
+    if (!followupDate) return { isSet: false, isOverdue: false, isToday: false, isReminderOn: reminder !== 'OFF', label: 'No Date Set' };
+    const todayStr = new Date().toISOString().split('T')[0];
+    let compDate = followupDate;
+    if (followupDate.includes('/')) {
+      const parts = followupDate.split('/');
+      if (parts.length === 3) compDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+
+    const isReminderOn = reminder !== 'OFF';
+    const isOverdue = compDate < todayStr;
+    const isToday = compDate === todayStr;
+
+    let label = `Scheduled for ${followupDate}`;
+    if (isOverdue) label = `Overdue (${followupDate})`;
+    else if (isToday) label = `Due Today! (${followupDate})`;
+
+    return {
+      isSet: true,
+      isOverdue,
+      isToday,
+      isReminderOn,
+      label,
+      compDate
+    };
+  };
 
   // Sale Lead Form State (initialized with first vehicle in list)
   const [leadFormData, setLeadFormData] = useState({
@@ -94,6 +113,7 @@ export default function LeadsManagement({
     aadhar: '',
     address: '',
     sourceType: 'Walk-In',
+    entryDate: new Date().toISOString().split('T')[0],
     executive: executiveList[0],
     vehicleModel: (vehicleList && vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G',
     vehicleColor: (allVehicleColors && allVehicleColors[0]) || 'Blue',
@@ -101,6 +121,8 @@ export default function LeadsManagement({
     leadType: 'Hot',
     status: 'Entered',
     followupDate: '',
+    reminder: 'ON',
+    reminderTime: '10:00',
     note: ''
   });
 
@@ -108,9 +130,15 @@ export default function LeadsManagement({
   const [quoteFormData, setQuoteFormData] = useState({
     customerName: '',
     customerPhone: '',
+    customerAddress: '',
+    customerEmail: '',
+    customerAadhar: '',
+    customerGst: '',
+    executive: executiveList[0] || 'Kishore Kumar',
     vehicleModel: '',
     vehicleColor: '',
     exShowroom: '',
+    gstRate: 5,
     rto: '',
     insurance: '',
     accessories: '',
@@ -118,6 +146,11 @@ export default function LeadsManagement({
     discount: ''
   });
 
+  const [quoteSearchQuery, setQuoteSearchQuery] = useState('');
+  const [showLeadNameSuggestions, setShowLeadNameSuggestions] = useState(false);
+  const [showLeadPhoneSuggestions, setShowLeadPhoneSuggestions] = useState(false);
+  const [showInvoiceNameSuggestions, setShowInvoiceNameSuggestions] = useState(false);
+  const [showInvoicePhoneSuggestions, setShowInvoicePhoneSuggestions] = useState(false);
   const [quoteSuccessMsg, setQuoteSuccessMsg] = useState('');
   const [invoiceSuccessMsg, setInvoiceSuccessMsg] = useState('');
   const [bookingSuccessMsg, setBookingSuccessMsg] = useState('');
@@ -125,41 +158,6 @@ export default function LeadsManagement({
   const [generatedQuote, setGeneratedQuote] = useState(() => (quotations && quotations.length > 0 ? quotations[0] : null));
   const [editingQuoteId, setEditingQuoteId] = useState(null);
   const [editingInvoiceId, setEditingInvoiceId] = useState(null);
-  const [isMonthlyReportOpen, setIsMonthlyReportOpen] = useState(false);
-  const [showColumnSelector, setShowColumnSelector] = useState(false);
-  const [reportFilters, setReportFilters] = useState({
-    month: 'ALL',
-    customerName: '',
-    vehicleModel: 'ALL',
-    paymentStatus: 'ALL',
-    minSaleAmount: '',
-    maxSaleAmount: '',
-    minGstAmount: '',
-    maxGstAmount: ''
-  });
-  const [visibleColumns, setVisibleColumns] = useState({
-    invoiceNo: true,
-    invoiceDate: true,
-    customerName: true,
-    customerPhone: true,
-    customerAddress: false,
-    customerAadhar: false,
-    customerGst: false,
-    vehicleModel: true,
-    vehicleColor: true,
-    vinNumber: true,
-    engineNo: false,
-    batteryNumber: false,
-    exShowroom: true,
-    gstRate: false,
-    gstAmount: true,
-    insurance: false,
-    rto: false,
-    subsidy: false,
-    discount: false,
-    grandTotal: true,
-    paymentStatus: true
-  });
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFormTab, setActiveFormTab] = useState(null); // 'lead' | 'quote' | 'booking' | 'invoice' | null
 
@@ -213,8 +211,15 @@ export default function LeadsManagement({
     paymentStatus: 'Fully Paid'
   });
   const [generatedInvoice, setGeneratedInvoice] = useState(() => (invoices && invoices.length > 0 ? invoices[0] : null));
+  const [generatedLead, setGeneratedLead] = useState(() => (leads && leads.length > 0 ? leads[0] : null));
 
   // Sync previews if list updates and nothing was loaded
+  useEffect(() => {
+    if (!generatedLead && leads && leads.length > 0) {
+      setGeneratedLead(leads[0]);
+    }
+  }, [leads, generatedLead]);
+
   useEffect(() => {
     if (!generatedQuote && quotations && quotations.length > 0) {
       setGeneratedQuote(quotations[0]);
@@ -239,169 +244,52 @@ export default function LeadsManagement({
     const hot = leads.filter(l => l.leadType === 'Hot').length;
     const walkIn = leads.filter(l => l.sourceType === 'Walk-In').length;
     const digital = total - walkIn;
-    return { total, hot, walkIn, digital };
+    const remindersOn = leads.filter(l => l.reminder !== 'OFF' && l.followupDate).length;
+    const dueToday = leads.filter(l => l.reminder !== 'OFF' && getFollowupStatus(l.followupDate, l.reminder).isToday).length;
+    const overdue = leads.filter(l => l.reminder !== 'OFF' && getFollowupStatus(l.followupDate, l.reminder).isOverdue).length;
+    return { total, hot, walkIn, digital, remindersOn, dueToday, overdue };
   }, [leads]);
-
-  // Monthly Wise Grouping for Invoices
-  const monthlyInvoiceReportData = React.useMemo(() => {
-    const monthGroups = {};
-
-    invoices.forEach(inv => {
-      const dateStr = inv.invoiceDate || inv.createdOn || '';
-      let monthKey = '2026-08'; // default
-      if (dateStr) {
-        if (dateStr.includes('-') && dateStr.length >= 7) {
-          monthKey = dateStr.substring(0, 7);
-        } else if (dateStr.includes('/')) {
-          const parts = dateStr.split('/');
-          if (parts.length === 3) {
-            monthKey = `${parts[2]}-${parts[1].padStart(2, '0')}`;
-          }
-        }
-      }
-
-      if (!monthGroups[monthKey]) {
-        monthGroups[monthKey] = {
-          monthKey,
-          invoices: [],
-          count: 0,
-          totalRevenue: 0,
-          totalTaxable: 0,
-          totalGst: 0,
-          totalInsurance: 0,
-          totalRto: 0,
-          totalSubsidy: 0,
-          totalDiscount: 0,
-          fullyPaid: 0,
-          partiallyPaid: 0,
-          unpaid: 0
-        };
-      }
-
-      const g = monthGroups[monthKey];
-      g.invoices.push(inv);
-      g.count += 1;
-      g.totalRevenue += Number(inv.grandTotal || 0);
-      g.totalTaxable += Number(inv.exShowroom || (inv.grandTotal * 0.78) || 0);
-      g.totalGst += Number(inv.gstAmount || Math.round(Number(inv.exShowroom || 0) * 0.05) || 0);
-      g.totalInsurance += Number(inv.insurance || 0);
-      g.totalRto += Number(inv.rto || 0);
-      g.totalSubsidy += Number(inv.subsidy || 0);
-      g.totalDiscount += Number(inv.discount || 0);
-
-      if (inv.paymentStatus === 'Fully Paid') g.fullyPaid += 1;
-      else if (inv.paymentStatus === 'Partially Paid') g.partiallyPaid += 1;
-      else g.unpaid += 1;
-    });
-
-    const monthList = Object.keys(monthGroups).sort().reverse();
-    return { monthGroups, monthList };
-  }, [invoices]);
-
-  // Filtered Invoices for the Report based on all user criteria
-  const filteredReportInvoices = React.useMemo(() => {
-    return invoices.filter(inv => {
-      // 1. Month filter
-      if (reportFilters.month !== 'ALL') {
-        const d = inv.invoiceDate || inv.createdOn || '';
-        let m = '2026-08';
-        if (d.includes('-') && d.length >= 7) m = d.substring(0, 7);
-        else if (d.includes('/')) {
-          const parts = d.split('/');
-          if (parts.length === 3) m = `${parts[2]}-${parts[1].padStart(2, '0')}`;
-        }
-        if (m !== reportFilters.month) return false;
-      }
-
-      // 2. Customer Name / Search filter
-      if (reportFilters.customerName.trim()) {
-        const q = reportFilters.customerName.toLowerCase().trim();
-        const matchName = (inv.customerName || '').toLowerCase().includes(q);
-        const matchPhone = (inv.customerPhone || inv.customerMobile || '').includes(q);
-        const matchInv = (inv.invoiceNo || '').toLowerCase().includes(q);
-        if (!matchName && !matchPhone && !matchInv) return false;
-      }
-
-      // 3. Vehicle Model filter
-      if (reportFilters.vehicleModel !== 'ALL') {
-        if (inv.vehicleModel !== reportFilters.vehicleModel) return false;
-      }
-
-      // 4. Payment Status filter
-      if (reportFilters.paymentStatus !== 'ALL') {
-        if (inv.paymentStatus !== reportFilters.paymentStatus) return false;
-      }
-
-      // 5. Min & Max Sale Amount (Grand Total)
-      const grandTotal = Number(inv.grandTotal || 0);
-      if (reportFilters.minSaleAmount && grandTotal < Number(reportFilters.minSaleAmount)) return false;
-      if (reportFilters.maxSaleAmount && grandTotal > Number(reportFilters.maxSaleAmount)) return false;
-
-      // 6. Min & Max GST Amount
-      const gstAmt = Number(inv.gstAmount || Math.round(Number(inv.exShowroom || 0) * 0.05) || 0);
-      if (reportFilters.minGstAmount && gstAmt < Number(reportFilters.minGstAmount)) return false;
-      if (reportFilters.maxGstAmount && gstAmt > Number(reportFilters.maxGstAmount)) return false;
-
-      return true;
-    });
-  }, [invoices, reportFilters]);
-
-  // Export Monthly Report to CSV dynamically reflecting active filters & visible fields
-  const handleExportMonthlyCSV = () => {
-    if (filteredReportInvoices.length === 0) {
-      alert('No matching invoices to export for this filter criteria.');
-      return;
-    }
-
-    const availableCols = [
-      { key: 'invoiceNo', label: 'Invoice No', getter: inv => inv.invoiceNo },
-      { key: 'invoiceDate', label: 'Invoice Date', getter: inv => inv.invoiceDate || inv.createdOn },
-      { key: 'customerName', label: 'Customer Name', getter: inv => `"${inv.customerName || ''}"` },
-      { key: 'customerPhone', label: 'Mobile Number', getter: inv => inv.customerPhone || inv.customerMobile || '' },
-      { key: 'customerAddress', label: 'Customer Address', getter: inv => `"${inv.customerAddress || ''}"` },
-      { key: 'customerAadhar', label: 'Aadhaar No', getter: inv => inv.customerAadhar || '' },
-      { key: 'customerGst', label: 'Customer GSTIN', getter: inv => inv.customerGst || '' },
-      { key: 'vehicleModel', label: 'Vehicle Model', getter: inv => `"${inv.vehicleModel || ''}"` },
-      { key: 'vehicleColor', label: 'Vehicle Color', getter: inv => `"${inv.vehicleColor || ''}"` },
-      { key: 'vinNumber', label: 'Chassis / VIN', getter: inv => inv.vinNumber || inv.vin || inv.chassisNo || '' },
-      { key: 'engineNo', label: 'Motor / Engine No', getter: inv => inv.engineNo || inv.motorNumber || '' },
-      { key: 'batteryNumber', label: 'Battery Serial No', getter: inv => inv.batteryNumber || inv.batteryNo || '' },
-      { key: 'exShowroom', label: 'Taxable Sale Amount (₹)', getter: inv => inv.exShowroom || (inv.grandTotal * 0.78) || 0 },
-      { key: 'gstRate', label: 'GST Rate %', getter: inv => inv.gstRate || 5 },
-      { key: 'gstAmount', label: 'GST Amount (₹)', getter: inv => inv.gstAmount || Math.round(Number(inv.exShowroom || 0) * 0.05) || 0 },
-      { key: 'insurance', label: 'Insurance (₹)', getter: inv => inv.insurance || 0 },
-      { key: 'rto', label: 'RTO & Life Tax (₹)', getter: inv => inv.rto || 0 },
-      { key: 'subsidy', label: 'Govt Subsidy (₹)', getter: inv => inv.subsidy || 0 },
-      { key: 'discount', label: 'Discount (₹)', getter: inv => inv.discount || 0 },
-      { key: 'grandTotal', label: 'Grand Total Amount (₹)', getter: inv => inv.grandTotal || 0 },
-      { key: 'paymentStatus', label: 'Payment Status', getter: inv => inv.paymentStatus || 'Fully Paid' }
-    ];
-
-    const activeCols = availableCols.filter(col => visibleColumns[col.key]);
-    const headers = activeCols.map(c => c.label);
-    const rows = filteredReportInvoices.map(inv => activeCols.map(c => c.getter(inv)));
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `NandhiMotors_Custom_Invoice_Report_${reportFilters.month}_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   const quoteSummaryStats = React.useMemo(() => {
     const totalCount = quotations.length;
-    const totalSum = quotations.reduce((acc, q) => acc + (q.total || 0), 0);
+    const totalSum = quotations.reduce((acc, q) => acc + Number(q.total || 0), 0);
     const avgVal = totalCount > 0 ? Math.round(totalSum / totalCount) : 0;
-    return { totalCount, avgVal };
-  }, [quotations]);
+    
+    // Top quoted model
+    const counts = {};
+    quotations.forEach(q => {
+      if (q.vehicleModel) counts[q.vehicleModel] = (counts[q.vehicleModel] || 0) + 1;
+    });
+    let topModel = (vehicleList && vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G';
+    let max = 0;
+    Object.entries(counts).forEach(([m, c]) => {
+      if (c > max) { max = c; topModel = m; }
+    });
+
+    return { totalCount, totalSum, avgVal, topModel };
+  }, [quotations, vehicleList]);
+
+  const filteredQuotations = React.useMemo(() => {
+    if (!quoteSearchQuery.trim()) return quotations;
+    const q = quoteSearchQuery.toLowerCase().trim();
+    return quotations.filter(item => 
+      (item.customerName || '').toLowerCase().includes(q) ||
+      (item.customerPhone || '').includes(q) ||
+      (item.quoteId || '').toLowerCase().includes(q) ||
+      (item.vehicleModel || '').toLowerCase().includes(q) ||
+      (item.vehicleColor || '').toLowerCase().includes(q)
+    );
+  }, [quotations, quoteSearchQuery]);
 
   const bookingSummaryStats = React.useMemo(() => {
     const totalCount = bookings.length;
-    const totalAdvance = bookings.reduce((sum, b) => sum + Number(b.bookingAmount || 0), 0);
-    return { totalCount, totalAdvance };
+    const activeCount = bookings.filter(b => b.status !== 'Returned').length;
+    const totalAdvance = bookings
+      .filter(b => b.status !== 'Returned')
+      .reduce((sum, b) => sum + Number(b.bookingAmount || 0), 0);
+    const returnedCount = bookings.filter(b => b.status === 'Returned').length;
+    const convertedCount = bookings.filter(b => b.status === 'Converted').length;
+    return { totalCount, activeCount, totalAdvance, returnedCount, convertedCount };
   }, [bookings]);
 
   const invoiceSummaryStats = React.useMemo(() => {
@@ -505,6 +393,7 @@ export default function LeadsManagement({
       vehicleModel: q.vehicleModel || (vehicleList[0] && vehicleList[0].name) || '',
       vehicleColor: q.vehicleColor || (allVehicleColors && allVehicleColors[0]) || '',
       exShowroom: q.exShowroom ? Number(q.exShowroom) : '',
+      gstRate: q.gstRate !== undefined ? Number(q.gstRate) : 5,
       insurance: q.insurance ? Number(q.insurance) : '',
       rto: q.rto ? Number(q.rto) : '',
       discount: q.discount ? Number(q.discount) : 0,
@@ -519,9 +408,229 @@ export default function LeadsManagement({
     setActiveFormTab('invoice');
   };
 
+  // Lead Autocomplete Matches for Quotation
+  const nameLeadMatches = React.useMemo(() => {
+    const q = (quoteFormData.customerName || '').trim().toLowerCase();
+    if (!q || q.length < 1) return [];
+    return leads.filter(l => (l.name || '').toLowerCase().includes(q) || (l.mobile || '').includes(q)).slice(0, 6);
+  }, [leads, quoteFormData.customerName]);
+
+  const phoneLeadMatches = React.useMemo(() => {
+    const q = (quoteFormData.customerPhone || '').trim();
+    if (!q || q.length < 2) return [];
+    return leads.filter(l => (l.mobile || '').includes(q)).slice(0, 6);
+  }, [leads, quoteFormData.customerPhone]);
+
+  const handlePickLeadSuggestion = (matchedLead) => {
+    if (!matchedLead) return;
+    const vModel = matchedLead.vehicle || matchedLead.vehicleModel || (vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G';
+    const matchedVeh = vehicleList && vehicleList.find(v => v.name === vModel);
+    const basePrice = matchedLead.price ? Number(matchedLead.price) : (matchedVeh ? matchedVeh.basePrice : 82000);
+    const vColor = matchedLead.color || matchedLead.vehicleColor || (allVehicleColors && allVehicleColors[0]) || 'Matte Blue';
+
+    setQuoteFormData(prev => ({
+      ...prev,
+      customerName: matchedLead.name || '',
+      customerPhone: matchedLead.mobile || '',
+      customerAddress: matchedLead.address || prev.customerAddress || '',
+      customerEmail: matchedLead.email || prev.customerEmail || '',
+      customerAadhar: matchedLead.aadhar || prev.customerAadhar || '',
+      executive: matchedLead.executive || prev.executive || '',
+      vehicleModel: vModel,
+      vehicleColor: vColor,
+      exShowroom: basePrice
+    }));
+    setShowLeadNameSuggestions(false);
+    setShowLeadPhoneSuggestions(false);
+    setQuoteSuccessMsg(`Auto-filled details for "${matchedLead.name}" from Lead #${matchedLead.id}!`);
+    setTimeout(() => setQuoteSuccessMsg(''), 4000);
+  };
+
+  // Combined Leads & Quotations Autocomplete Matches for Invoice
+  const invoiceNameMatches = React.useMemo(() => {
+    const q = (invoiceFormData.customerName || '').trim().toLowerCase();
+    if (!q || q.length < 1) return [];
+
+    const matches = [];
+
+    // 1. Check Quotations first (they have detailed pricing & GST structure)
+    (quotations || []).forEach(quote => {
+      const name = (quote.customerName || '').toLowerCase();
+      const phone = (quote.customerPhone || '');
+      if (name.includes(q) || phone.includes(q)) {
+        matches.push({
+          type: 'quotation',
+          id: quote.quoteId,
+          name: quote.customerName,
+          mobile: quote.customerPhone,
+          address: quote.customerAddress,
+          email: quote.customerEmail,
+          aadhar: quote.customerAadhar,
+          gstin: quote.customerGst,
+          vehicle: quote.vehicleModel,
+          color: quote.vehicleColor,
+          exShowroom: quote.exShowroom,
+          gstRate: quote.gstRate,
+          rto: quote.rto,
+          insurance: quote.insurance,
+          accessories: quote.accessories,
+          handling: quote.handling,
+          discount: quote.discount,
+          total: quote.total,
+          executive: quote.executive
+        });
+      }
+    });
+
+    // 2. Check Leads
+    (leads || []).forEach(lead => {
+      const name = (lead.name || '').toLowerCase();
+      const phone = (lead.mobile || '');
+      if (name.includes(q) || phone.includes(q)) {
+        matches.push({
+          type: 'lead',
+          id: lead.id,
+          name: lead.name,
+          mobile: lead.mobile,
+          address: lead.address,
+          email: lead.email,
+          aadhar: lead.aadhar,
+          gstin: lead.gst || lead.gstin,
+          vehicle: lead.vehicle || lead.vehicleModel,
+          color: lead.color || lead.vehicleColor,
+          price: lead.price,
+          executive: lead.executive
+        });
+      }
+    });
+
+    return matches.slice(0, 8);
+  }, [leads, quotations, invoiceFormData.customerName]);
+
+  const invoicePhoneMatches = React.useMemo(() => {
+    const q = (invoiceFormData.customerPhone || '').trim();
+    if (!q || q.length < 2) return [];
+
+    const matches = [];
+
+    (quotations || []).forEach(quote => {
+      if ((quote.customerPhone || '').includes(q)) {
+        matches.push({
+          type: 'quotation',
+          id: quote.quoteId,
+          name: quote.customerName,
+          mobile: quote.customerPhone,
+          address: quote.customerAddress,
+          email: quote.customerEmail,
+          aadhar: quote.customerAadhar,
+          gstin: quote.customerGst,
+          vehicle: quote.vehicleModel,
+          color: quote.vehicleColor,
+          exShowroom: quote.exShowroom,
+          gstRate: quote.gstRate,
+          rto: quote.rto,
+          insurance: quote.insurance,
+          discount: quote.discount,
+          total: quote.total,
+          executive: quote.executive
+        });
+      }
+    });
+
+    (leads || []).forEach(lead => {
+      if ((lead.mobile || '').includes(q)) {
+        matches.push({
+          type: 'lead',
+          id: lead.id,
+          name: lead.name,
+          mobile: lead.mobile,
+          address: lead.address,
+          email: lead.email,
+          aadhar: lead.aadhar,
+          gstin: lead.gst || lead.gstin,
+          vehicle: lead.vehicle || lead.vehicleModel,
+          color: lead.color || lead.vehicleColor,
+          price: lead.price,
+          executive: lead.executive
+        });
+      }
+    });
+
+    return matches.slice(0, 8);
+  }, [leads, quotations, invoiceFormData.customerPhone]);
+
+  const handlePickInvoiceCustomerSuggestion = (match) => {
+    if (!match) return;
+    const vModel = match.vehicle || match.vehicleModel || (vehicleList[0] && vehicleList[0].name) || '';
+    const vColor = match.color || match.vehicleColor || (allVehicleColors && allVehicleColors[0]) || '';
+    const ex = match.exShowroom ? Number(match.exShowroom) : (match.price ? Number(match.price) : '');
+    const gstRateVal = match.gstRate !== undefined ? Number(match.gstRate) : 5;
+    const rtoVal = match.rto ? Number(match.rto) : '';
+    const insVal = match.insurance ? Number(match.insurance) : '';
+    const discVal = match.discount ? Number(match.discount) : 0;
+
+    setInvoiceFormData(prev => ({
+      ...prev,
+      customerName: match.name || match.customerName || prev.customerName,
+      customerPhone: match.mobile || match.customerPhone || prev.customerPhone,
+      customerAddress: match.address || match.customerAddress || prev.customerAddress,
+      customerEmail: match.email || match.customerEmail || prev.customerEmail,
+      customerAadhar: match.aadhar || match.customerAadhar || prev.customerAadhar,
+      customerGst: (match.gstin || match.gst || match.customerGst || prev.customerGst || '').toUpperCase(),
+      vehicleModel: vModel || prev.vehicleModel,
+      vehicleColor: vColor || prev.vehicleColor,
+      exShowroom: ex !== '' ? ex : prev.exShowroom,
+      gstRate: gstRateVal,
+      rto: rtoVal !== '' ? rtoVal : prev.rto,
+      insurance: insVal !== '' ? insVal : prev.insurance,
+      discount: discVal
+    }));
+    setShowInvoiceNameSuggestions(false);
+    setShowInvoicePhoneSuggestions(false);
+    setInvoiceSuccessMsg(`Auto-filled from ${match.type === 'quotation' ? `Quotation #${match.id}` : `Sale Lead #${match.id}`} for "${match.name || match.customerName}"!`);
+    setTimeout(() => setInvoiceSuccessMsg(''), 4000);
+  };
+
+  // Quick Quotation generator from Lead
+  const handleConvertToQuotation = (lead) => {
+    if (!lead) return;
+    const vModel = lead.vehicle || lead.vehicleModel || (vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G';
+    const matchedVeh = vehicleList && vehicleList.find(v => v.name === vModel);
+    const basePrice = lead.price ? Number(lead.price) : (matchedVeh ? matchedVeh.basePrice : 82000);
+    const vColor = lead.color || lead.vehicleColor || (allVehicleColors && allVehicleColors[0]) || 'Matte Blue';
+
+    setEditingQuoteId(null);
+    setShowLeadNameSuggestions(false);
+    setShowLeadPhoneSuggestions(false);
+    setQuoteFormData({
+      customerName: lead.name || '',
+      customerPhone: lead.mobile || '',
+      customerAddress: lead.address || '',
+      customerEmail: lead.email || '',
+      customerAadhar: lead.aadhar || '',
+      customerGst: '',
+      executive: lead.executive || executiveList[0] || 'Kishore Kumar',
+      vehicleModel: vModel,
+      vehicleColor: vColor,
+      exShowroom: basePrice,
+      gstRate: 5,
+      rto: 10400,
+      insurance: 6200,
+      accessories: 1500,
+      handling: 0,
+      discount: 0
+    });
+    setActiveSubTab('quotation');
+    setActiveFormTab('quote');
+    setQuoteSuccessMsg(`Imported customer details for "${lead.name}"!`);
+    setTimeout(() => setQuoteSuccessMsg(''), 4000);
+  };
+
   // Open New Quotation Modal with initial defaults
   const handleOpenAddQuote = () => {
     setEditingQuoteId(null);
+    setShowLeadNameSuggestions(false);
+    setShowLeadPhoneSuggestions(false);
     const defaultModel = (vehicleList && vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G';
     const matchedVeh = vehicleList && vehicleList.find(v => v.name === defaultModel);
     const defaultPrice = matchedVeh ? matchedVeh.basePrice : 82000;
@@ -529,9 +638,15 @@ export default function LeadsManagement({
     setQuoteFormData({
       customerName: '',
       customerPhone: '',
+      customerAddress: '',
+      customerEmail: '',
+      customerAadhar: '',
+      customerGst: '',
+      executive: executiveList[0] || 'Kishore Kumar',
       vehicleModel: defaultModel,
       vehicleColor: defaultColor,
       exShowroom: defaultPrice,
+      gstRate: 5,
       rto: 10400,
       insurance: 6200,
       accessories: 1500,
@@ -544,12 +659,20 @@ export default function LeadsManagement({
   // Edit Handlers for Quotation and Invoice
   const handleEditQuotation = (q) => {
     setEditingQuoteId(q.quoteId);
+    setShowLeadNameSuggestions(false);
+    setShowLeadPhoneSuggestions(false);
     setQuoteFormData({
       customerName: q.customerName || '',
       customerPhone: q.customerPhone || '',
+      customerAddress: q.customerAddress || '',
+      customerEmail: q.customerEmail || '',
+      customerAadhar: q.customerAadhar || '',
+      customerGst: q.customerGst || '',
+      executive: q.executive || executiveList[0] || 'Kishore Kumar',
       vehicleModel: q.vehicleModel || (vehicleList[0] && vehicleList[0].name) || '',
       vehicleColor: q.vehicleColor || (allVehicleColors && allVehicleColors[0]) || '',
       exShowroom: q.exShowroom || '',
+      gstRate: q.gstRate !== undefined ? Number(q.gstRate) : 5,
       rto: q.rto || '',
       insurance: q.insurance || '',
       accessories: q.accessories || '',
@@ -623,6 +746,98 @@ export default function LeadsManagement({
       fetchBookings();
     }
   }, [activeSubTab]);
+
+  // Convert Booking directly into a Tax Invoice
+  const handleConvertBookingToInvoice = (b) => {
+    if (!b) return;
+    const vModel = b.vehicleModel || (vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G';
+    const matchedVeh = vehicleList && vehicleList.find(v => v.name === vModel);
+    const basePrice = matchedVeh ? Number(matchedVeh.basePrice) : 82000;
+    const vColor = b.vehicleColor || (allVehicleColors && allVehicleColors[0]) || 'Matte Blue';
+    const advanceAmt = Number(b.bookingAmount || 0);
+
+    setInvoiceFormData(prev => ({
+      ...prev,
+      customerName: b.customerName || '',
+      customerPhone: b.mobile || '',
+      customerAddress: b.address || prev.customerAddress || '',
+      customerAadhar: b.customerAadhar || prev.customerAadhar || '',
+      vehicleModel: vModel,
+      vehicleColor: vColor,
+      exShowroom: basePrice,
+      gstRate: 5,
+      insurance: 4200,
+      rto: 6500,
+      discount: 0,
+      vinNumber: '',
+      batteryNumber: '',
+      chargerNumber: '',
+      controllerNumber: '',
+      paymentStatus: 'Fully Paid',
+      notes: `Advance Booking #${b.id || ''} (₹${advanceAmt.toLocaleString('en-IN')} paid via ${b.paymentMode || 'Cash'})`
+    }));
+
+    // Update booking status to Converted
+    if (b.id) {
+      const updated = { ...b, status: 'Converted' };
+      setBookings(prev => prev.map(item => item.id === b.id ? updated : item));
+      try {
+        fetch(`${API_BASE_URL}/api/bookings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updated)
+        }).catch(err => console.error(err));
+      } catch (e) {}
+    }
+
+    setEditingInvoiceId(null);
+    setPrintModalConfig(prev => ({ ...prev, isOpen: false }));
+    setActiveSubTab('invoice');
+    setActiveFormTab('invoice');
+    setBookingSuccessMsg(`Booking #${b.id} transferred to Sale Invoice!`);
+    setTimeout(() => setBookingSuccessMsg(''), 4000);
+  };
+
+  // Return / Refund Booking Advance Amount
+  const handleReturnBooking = async (b) => {
+    if (!b) return;
+    const isCurrentlyReturned = b.status === 'Returned';
+    const actionText = isCurrentlyReturned 
+      ? `Reactivate Booking #${b.id} (Cancel Return)?`
+      : `Confirm Return / Refund of booking advance ₹${Number(b.bookingAmount || 0).toLocaleString('en-IN')} for Booking #${b.id} (${b.customerName})?`;
+
+    if (!window.confirm(actionText)) return;
+
+    const newStatus = isCurrentlyReturned ? 'Active' : 'Returned';
+    const returnDate = isCurrentlyReturned ? '' : new Date().toLocaleDateString('en-IN');
+    const updated = {
+      ...b,
+      status: newStatus,
+      returnDate: returnDate
+    };
+
+    setBookings(prev => prev.map(item => item.id === b.id ? updated : item));
+    if (generatedBooking?.id === b.id) {
+      setGeneratedBooking(updated);
+    }
+
+    setBookingSuccessMsg(
+      isCurrentlyReturned 
+        ? `Booking #${b.id} reactivated to Active state.` 
+        : `Booking #${b.id} advance of ₹${Number(b.bookingAmount || 0).toLocaleString('en-IN')} marked as RETURNED / REFUNDED.`
+    );
+    setTimeout(() => setBookingSuccessMsg(''), 4000);
+
+    try {
+      await fetch(`${API_BASE_URL}/api/bookings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+    } catch (err) {
+      console.warn('Backend fallback to local storage for booking update:', err);
+    }
+  };
 
   const deleteBooking = async (id) => {
     try {
@@ -712,6 +927,7 @@ export default function LeadsManagement({
       aadhar: '',
       address: '',
       sourceType: 'Walk-In',
+      entryDate: new Date().toISOString().split('T')[0],
       executive: executiveList[0] || 'Kishore Kumar',
       vehicleModel: (vehicleList && vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G',
       vehicleColor: (vehicleList && vehicleList[0] && vehicleList[0].colors && vehicleList[0].colors[0]) || (allVehicleColors && allVehicleColors[0]) || 'Blue',
@@ -719,6 +935,8 @@ export default function LeadsManagement({
       leadType: 'Hot',
       status: 'Entered',
       followupDate: '',
+      reminder: 'ON',
+      reminderTime: '10:00',
       note: ''
     });
     setActiveFormTab('lead');
@@ -726,6 +944,17 @@ export default function LeadsManagement({
 
   const handleOpenEditLead = (lead) => {
     setEditingLead(lead);
+    const parsedEntryDate = (() => {
+      const d = lead.entryDate || lead.createdOn;
+      if (!d) return new Date().toISOString().split('T')[0];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+      if (d.includes('/')) {
+        const p = d.split('/');
+        if (p.length === 3) return `${p[2].length === 4 ? p[2] : `20${p[2]}`}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+      }
+      return new Date().toISOString().split('T')[0];
+    })();
+
     setLeadFormData({
       name: lead.name || '',
       mobile: lead.mobile || '',
@@ -733,6 +962,7 @@ export default function LeadsManagement({
       aadhar: lead.aadhar || '',
       address: lead.address || '',
       sourceType: lead.sourceType || 'Walk-In',
+      entryDate: parsedEntryDate,
       executive: lead.executive || executiveList[0],
       vehicleModel: lead.vehicle || (vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G',
       vehicleColor: lead.color || (allVehicleColors && allVehicleColors[0]) || 'Blue',
@@ -740,14 +970,31 @@ export default function LeadsManagement({
       leadType: lead.leadType || 'Hot',
       status: lead.status || 'Entered',
       followupDate: lead.followupDate || '',
+      reminder: lead.reminder === 'OFF' ? 'OFF' : 'ON',
+      reminderTime: lead.reminderTime || '10:00',
       note: lead.note || ''
     });
     setActiveFormTab('lead');
   };
 
+  const handleToggleLeadReminder = async (lead) => {
+    const currentReminder = lead.reminder === 'OFF' ? 'OFF' : 'ON';
+    const newReminder = currentReminder === 'ON' ? 'OFF' : 'ON';
+    const updated = { ...lead, reminder: newReminder };
+    if (updateLead) {
+      await updateLead(lead.id, updated);
+    } else if (setLeads) {
+      setLeads(prev => prev.map(l => (l.id === lead.id ? updated : l)));
+    }
+  };
+
   // Submit Sale Lead (Create or Edit)
   const handleLeadFormSubmit = async (e) => {
     e.preventDefault();
+
+    const entryDateVal = leadFormData.entryDate || new Date().toISOString().split('T')[0];
+    const dateParts = entryDateVal.split('-');
+    const formattedCreatedOn = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : new Date().toLocaleDateString('en-IN');
 
     if (editingLead) {
       const updatedItem = {
@@ -758,6 +1005,7 @@ export default function LeadsManagement({
         aadhar: leadFormData.aadhar,
         address: leadFormData.address || 'N/A',
         sourceType: leadFormData.sourceType,
+        entryDate: entryDateVal,
         executive: leadFormData.executive,
         vehicle: leadFormData.vehicleModel,
         color: leadFormData.vehicleColor,
@@ -765,7 +1013,10 @@ export default function LeadsManagement({
         leadType: leadFormData.leadType,
         status: leadFormData.status,
         followupDate: leadFormData.followupDate,
-        note: leadFormData.note
+        reminder: leadFormData.reminder || 'ON',
+        reminderTime: leadFormData.reminderTime || '10:00',
+        note: leadFormData.note,
+        createdOn: editingLead.createdOn || formattedCreatedOn
       };
 
       if (updateLead) {
@@ -792,6 +1043,7 @@ export default function LeadsManagement({
         aadhar: leadFormData.aadhar,
         address: leadFormData.address || 'N/A',
         sourceType: leadFormData.sourceType,
+        entryDate: entryDateVal,
         executive: leadFormData.executive,
         vehicle: leadFormData.vehicleModel,
         color: leadFormData.vehicleColor,
@@ -799,8 +1051,10 @@ export default function LeadsManagement({
         leadType: leadFormData.leadType,
         status: leadFormData.status || 'Entered',
         followupDate: leadFormData.followupDate,
+        reminder: leadFormData.reminder || 'ON',
+        reminderTime: leadFormData.reminderTime || '10:00',
         note: leadFormData.note,
-        createdOn: new Date().toLocaleDateString('en-IN')
+        createdOn: formattedCreatedOn
       };
 
       if (addLead) {
@@ -840,6 +1094,7 @@ export default function LeadsManagement({
       aadhar: '',
       address: '',
       sourceType: 'Walk-In',
+      entryDate: new Date().toISOString().split('T')[0],
       executive: executiveList[0] || 'Kishore Kumar',
       vehicleModel: (vehicleList && vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G',
       vehicleColor: (vehicleList && vehicleList[0] && vehicleList[0].colors && vehicleList[0].colors[0]) || (allVehicleColors && allVehicleColors[0]) || 'Blue',
@@ -847,6 +1102,8 @@ export default function LeadsManagement({
       leadType: 'Hot',
       status: 'Entered',
       followupDate: '',
+      reminder: 'ON',
+      reminderTime: '10:00',
       note: ''
     });
 
@@ -862,25 +1119,6 @@ export default function LeadsManagement({
     }
   };
 
-  const handleConvertToQuotation = (lead) => {
-    setQuoteFormData({
-      customerName: lead.name || '',
-      customerPhone: lead.mobile || '',
-      vehicleModel: lead.vehicle || (vehicleList[0] && vehicleList[0].name) || '',
-      vehicleColor: lead.color || '',
-      exShowroom: lead.price ? Number(lead.price) : '',
-      rto: '',
-      insurance: '',
-      accessories: '',
-      handling: '',
-      discount: ''
-    });
-    setGeneratedQuote(null);
-    setEditingQuoteId(null);
-    setActiveSubTab('quotation');
-    setActiveFormTab('quote');
-  };
-
   const handleDeleteLeadAction = async (id) => {
     if (confirm(`Are you sure you want to delete lead ${id}?`)) {
       if (deleteLead) {
@@ -893,12 +1131,16 @@ export default function LeadsManagement({
 
   // Compute Total On-Road Price
   const calculateOnRoadTotal = () => {
-    const total = Number(quoteFormData.exShowroom || 0) +
-                  Number(quoteFormData.rto || 0) +
-                  Number(quoteFormData.insurance || 0) +
-                  Number(quoteFormData.accessories || 0) +
-                  Number(quoteFormData.handling || 0) -
-                  Number(quoteFormData.discount || 0);
+    const ex = Number(quoteFormData.exShowroom || 0);
+    const gstRate = Number(quoteFormData.gstRate || 0);
+    const gstAmount = Math.round(ex * (gstRate / 100));
+    const rto = Number(quoteFormData.rto || 0);
+    const ins = Number(quoteFormData.insurance || 0);
+    const acc = Number(quoteFormData.accessories || 0);
+    const handling = Number(quoteFormData.handling || 0);
+    const disc = Number(quoteFormData.discount || 0);
+
+    const total = ex + gstAmount + rto + ins + acc + handling - disc;
     return isNaN(total) ? 0 : total;
   };
 
@@ -906,6 +1148,9 @@ export default function LeadsManagement({
   const handleQuoteSubmit = async (e) => {
     e.preventDefault();
     const details = calculateOnRoadTotal();
+    const exVal = Number(quoteFormData.exShowroom || 0);
+    const gstRateVal = Number(quoteFormData.gstRate !== undefined ? quoteFormData.gstRate : 5);
+    const gstAmtVal = Math.round(exVal * (gstRateVal / 100));
     const nextQuoteNum = quotations.reduce((max, q) => {
       const n = parseInt((q.quoteId || '').replace(/\D/g, ''), 10);
       return !isNaN(n) && n > max ? n : max;
@@ -915,7 +1160,16 @@ export default function LeadsManagement({
       ...quoteFormData,
       quoteId,
       createdOn: quoteFormData.createdOn || new Date().toLocaleDateString('en-IN'),
-      exShowroom: Number(quoteFormData.exShowroom || 0),
+      customerName: quoteFormData.customerName || '',
+      customerPhone: quoteFormData.customerPhone || '',
+      customerAddress: quoteFormData.customerAddress || '',
+      customerEmail: quoteFormData.customerEmail || '',
+      customerAadhar: quoteFormData.customerAadhar || '',
+      customerGst: (quoteFormData.customerGst || '').toUpperCase(),
+      executive: quoteFormData.executive || '',
+      exShowroom: exVal,
+      gstRate: gstRateVal,
+      gstAmount: gstAmtVal,
       rto: Number(quoteFormData.rto || 0),
       insurance: Number(quoteFormData.insurance || 0),
       accessories: Number(quoteFormData.accessories || 0),
@@ -936,24 +1190,38 @@ export default function LeadsManagement({
     const matchQuery = !q || (l.name || '').toLowerCase().includes(q) || (l.mobile || '').includes(q) || (l.id || '').toLowerCase().includes(q);
     const matchStatus = leadStatusFilter === 'ALL' || l.status === leadStatusFilter;
     const matchTemp = leadTempFilter === 'ALL' || l.leadType === leadTempFilter;
-    return matchQuery && matchStatus && matchTemp;
+
+    let matchReminder = true;
+    if (leadReminderFilter === 'REMINDER_ON') {
+      matchReminder = l.reminder !== 'OFF';
+    } else if (leadReminderFilter === 'DUE_TODAY') {
+      matchReminder = l.reminder !== 'OFF' && getFollowupStatus(l.followupDate, l.reminder).isToday;
+    } else if (leadReminderFilter === 'OVERDUE') {
+      matchReminder = l.reminder !== 'OFF' && getFollowupStatus(l.followupDate, l.reminder).isOverdue;
+    } else if (leadReminderFilter === 'REMINDER_OFF') {
+      matchReminder = l.reminder === 'OFF';
+    }
+
+    return matchQuery && matchStatus && matchTemp && matchReminder;
   });
 
+
+  const currentSubTab = activeSubTab || 'sale-lead';
 
   return (
     <div style={{ animation: 'fadeIn 0.2s ease' }}>
       {/* Sub Tabs */}
       <div className="sub-tabs-container">
-        <span className={`sub-tab ${activeSubTab === 'sale-lead' ? 'active' : ''}`} onClick={() => setActiveSubTab('sale-lead')}>
+        <span className={`sub-tab ${currentSubTab === 'sale-lead' ? 'active' : ''}`} onClick={() => setActiveSubTab('sale-lead')}>
           Sale Lead
         </span>
-        <span className={`sub-tab ${activeSubTab === 'quotation' ? 'active' : ''}`} onClick={() => setActiveSubTab('quotation')}>
+        <span className={`sub-tab ${currentSubTab === 'quotation' ? 'active' : ''}`} onClick={() => setActiveSubTab('quotation')}>
           Quotation
         </span>
-        <span className={`sub-tab ${activeSubTab === 'invoice' ? 'active' : ''}`} onClick={() => setActiveSubTab('invoice')}>
+        <span className={`sub-tab ${currentSubTab === 'invoice' ? 'active' : ''}`} onClick={() => setActiveSubTab('invoice')}>
           Invoice
         </span>
-        <span className={`sub-tab ${activeSubTab === 'booking' ? 'active' : ''}`} onClick={() => setActiveSubTab('booking')}>
+        <span className={`sub-tab ${currentSubTab === 'booking' ? 'active' : ''}`} onClick={() => setActiveSubTab('booking')}>
           Booking
         </span>
       </div>
@@ -979,19 +1247,24 @@ export default function LeadsManagement({
       )}
 
       {/* SUBTAB 1: SALE LEAD */}
-      {activeSubTab === 'sale-lead' && (
-        <div style={{ animation: 'fadeIn 0.2s ease' }}>
-          {/* Leads List Side */}
+      {currentSubTab === 'sale-lead' && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: showPreviews ? '1.2fr 1fr' : '1fr',
+          gap: '24px',
+          animation: 'fadeIn 0.2s ease'
+        }}>
+          {/* Left Column: Saved Sale Leads Ledger */}
           <div className="card">
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-              <h3 className="card-title">Submitted Sale Leads Ledger</h3>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <h3 className="card-title">Saved Sale Leads</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div className="quick-search">
                   <Search size={14} className="quick-search-icon" />
                   <input
                     type="text"
                     placeholder="Search name/phone/ID..."
-                    style={{ width: '180px', padding: '6px 10px 6px 30px', fontSize: '0.8rem' }}
+                    style={{ width: '160px', padding: '6px 10px 6px 28px', fontSize: '0.78rem' }}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -1006,129 +1279,123 @@ export default function LeadsManagement({
               </div>
             </div>
 
-            {/* Filter & Metric Bar */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '10px',
-              padding: '12px 20px',
-              backgroundColor: '#f9fafb',
-              borderBottom: '1px solid #e5e7eb'
-            }}>
-              {/* Metric stats */}
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <div style={{ backgroundColor: '#ffffff', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.8rem' }}>
-                  <span style={{ color: '#6b7280' }}>Total: </span>
-                  <strong style={{ color: '#1f2937' }}>{leadsSummaryStats.total}</strong>
+            <div className="card-body" style={{ maxHeight: '680px', overflowY: 'auto', padding: '12px' }}>
+              {/* 3-column Top Stats Summary matching Invoice style */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '8px',
+                backgroundColor: '#f9fafb',
+                padding: '10px',
+                borderRadius: '6px',
+                border: '1px solid #e5e7eb',
+                marginBottom: '10px',
+                textAlign: 'center'
+              }}>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Total Leads</span>
+                  <strong style={{ fontSize: '0.9rem', color: '#1f2937' }}>{leadsSummaryStats.total}</strong>
                 </div>
-                <div style={{ backgroundColor: '#ffffff', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.8rem' }}>
-                  <span style={{ color: '#ef4444' }}>🔥 Hot: </span>
-                  <strong style={{ color: '#ef4444' }}>{leadsSummaryStats.hot}</strong>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>🔥 Hot Leads</span>
+                  <strong style={{ fontSize: '0.9rem', color: '#ef4444' }}>{leadsSummaryStats.hot}</strong>
                 </div>
-                <div style={{ backgroundColor: '#ffffff', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.8rem' }}>
-                  <span style={{ color: '#059669' }}>Walk-in: </span>
-                  <strong style={{ color: '#059669' }}>{leadsSummaryStats.walkIn}</strong>
-                </div>
-                <div style={{ backgroundColor: '#ffffff', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.8rem' }}>
-                  <span style={{ color: '#2563eb' }}>Digital: </span>
-                  <strong style={{ color: '#2563eb' }}>{leadsSummaryStats.digital}</strong>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>🔔 Reminders ON</span>
+                  <strong style={{ fontSize: '0.9rem', color: '#059669' }}>{leadsSummaryStats.remindersOn}</strong>
                 </div>
               </div>
 
-              {/* Status Filter Chips */}
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 600 }}>Filter:</span>
-                {['ALL', 'Entered', 'Follow-up', 'Convert'].map(st => (
+              {/* Filter Chips Bar */}
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '10px' }}>
+                {[
+                  { key: 'ALL', label: 'All' },
+                  { key: 'REMINDER_ON', label: '🔔 ON' },
+                  { key: 'DUE_TODAY', label: '⏰ Today' },
+                  { key: 'OVERDUE', label: '⚠️ Overdue' },
+                  { key: 'REMINDER_OFF', label: '🔕 OFF' }
+                ].map(rf => (
                   <button
-                    key={st}
+                    key={rf.key}
                     type="button"
                     style={{
-                      padding: '3px 8px',
-                      fontSize: '0.72rem',
+                      padding: '2px 7px',
+                      fontSize: '0.7rem',
                       borderRadius: '4px',
                       border: '1px solid',
-                      borderColor: leadStatusFilter === st ? '#059669' : '#d1d5db',
-                      backgroundColor: leadStatusFilter === st ? '#ecfdf5' : '#ffffff',
-                      color: leadStatusFilter === st ? '#059669' : '#4b5563',
+                      borderColor: leadReminderFilter === rf.key ? '#059669' : '#d1d5db',
+                      backgroundColor: leadReminderFilter === rf.key ? '#ecfdf5' : '#ffffff',
+                      color: leadReminderFilter === rf.key ? '#059669' : '#4b5563',
                       cursor: 'pointer',
-                      fontWeight: leadStatusFilter === st ? 600 : 400
+                      fontWeight: leadReminderFilter === rf.key ? 600 : 400
                     }}
-                    onClick={() => setLeadStatusFilter(st)}
+                    onClick={() => setLeadReminderFilter(rf.key)}
                   >
-                    {st === 'ALL' ? 'All Statuses' : st}
+                    {rf.label}
                   </button>
                 ))}
               </div>
-            </div>
 
-            <div className="card-body" style={{ padding: 0, maxHeight: '720px', overflowY: 'auto' }}>
-              {filteredLeads.length > 0 ? (
-                filteredLeads.map((lead) => (
-                  <div
-                    key={lead.id}
-                    style={{
-                      borderBottom: '1px solid #f3f4f6',
-                      padding: '16px 20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '10px',
-                      backgroundColor: lead.leadType === 'Hot' ? '#fffaf8' : '#ffffff',
-                      position: 'relative'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
-                          {lead.id}
+              {/* Clean List of Leads matching Invoice list item design */}
+              {filteredLeads && filteredLeads.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {filteredLeads.map((lead) => (
+                    <div
+                      key={lead.id}
+                      onClick={() => setGeneratedLead(lead)}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '10px 12px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        backgroundColor: generatedLead?.id === lead.id ? '#f0fdf4' : '#ffffff',
+                        borderColor: generatedLead?.id === lead.id ? '#86efac' : '#e5e7eb',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <strong>Lead #{lead.id}</strong> | <span style={{ fontWeight: 600 }}>{lead.name}</span>
+                          {lead.leadType === 'Hot' && (
+                            <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', backgroundColor: '#fef2f2', color: '#dc2626', fontWeight: 700, border: '1px solid #fecaca' }}>
+                              🔥 Hot
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ color: '#6b7280', fontSize: '0.74rem' }}>
+                          Entry: {lead.entryDate ? (lead.entryDate.includes('-') ? lead.entryDate.split('-').reverse().join('/') : lead.entryDate) : (lead.createdOn || 'Recent')} | 📞 {lead.mobile} | 🏍️ {lead.vehicle} {lead.color ? `(${lead.color})` : ''}
                         </span>
-                        <span className={`badge ${lead.leadType === 'Hot' ? 'badge-danger' : 'badge-info'}`}>
-                          {lead.leadType === 'Hot' ? '🔥 Hot' : lead.leadType}
-                        </span>
-                        {/* Status dropdown quick toggle */}
-                        <select
-                          value={lead.status || 'Entered'}
-                          onChange={(e) => handleQuickStatusChange(lead, e.target.value)}
-                          style={{
-                            fontSize: '0.75rem',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            border: '1px solid #d1d5db',
-                            backgroundColor: lead.status === 'Convert' ? '#ecfdf5' : lead.status === 'Follow-up' ? '#fffbeb' : '#f3f4f6',
-                            color: lead.status === 'Convert' ? '#047857' : lead.status === 'Follow-up' ? '#b45309' : '#374151',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <option value="Entered">Entered</option>
-                          <option value="Follow-up">In Follow-up</option>
-                          <option value="Convert">Converted</option>
-                        </select>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                        {/* WhatsApp Action */}
-                        <a
-                          href={`https://wa.me/91${lead.mobile}?text=${encodeURIComponent(`Hello ${lead.name}, greetings from Nandhi Motors regarding your inquiry for ${lead.vehicle || 'two-wheeler'}.`)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn btn-secondary btn-sm"
-                          style={{ padding: '4px 8px', color: '#16a34a', borderColor: '#bbf7d0', backgroundColor: '#f0fdf4', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}
-                          title="WhatsApp Customer"
-                        >
-                          <MessageCircle size={13} /> WhatsApp
-                        </a>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }} onClick={(e) => e.stopPropagation()}>
+                        <strong style={{ color: '#059669', marginRight: '4px', fontSize: '0.88rem' }}>
+                          ₹{Number(lead.price || 0).toLocaleString('en-IN')}
+                        </strong>
 
-                        {/* Convert to Quotation Action */}
+                        {/* Convert to Quotation */}
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm"
-                          style={{ padding: '4px 8px', color: '#059669', borderColor: '#a7f3d0', backgroundColor: '#ecfdf5', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}
+                          style={{ padding: '4px 8px', color: '#059669', borderColor: '#bbf7d0', backgroundColor: '#f0fdf4' }}
                           onClick={() => handleConvertToQuotation(lead)}
-                          title="Generate Quotation for this Lead"
+                          title="Generate Price Quotation from Lead"
                         >
-                          <Calculator size={13} /> Create Quote
+                          <Calculator size={13} />
+                        </button>
+
+                        {/* Quick Reminder Toggle */}
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '4px 8px', color: lead.reminder === 'OFF' ? '#9ca3af' : '#d97706', borderColor: '#fed7aa', backgroundColor: '#fffbeb' }}
+                          onClick={() => handleToggleLeadReminder(lead)}
+                          title={lead.reminder === 'OFF' ? 'Turn On Reminder' : 'Turn Off Reminder'}
+                        >
+                          {lead.reminder === 'OFF' ? <BellOff size={13} /> : <Bell size={13} />}
                         </button>
 
                         {/* Edit Lead Button */}
@@ -1154,91 +1421,198 @@ export default function LeadsManagement({
                         </button>
                       </div>
                     </div>
-
-                    <div>
-                      <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#1f2937', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {lead.name}
-                        <span style={{ fontSize: '0.75rem', fontWeight: 400, color: '#6b7280' }}>
-                          (Registered: {lead.createdOn || 'Recent'})
-                        </span>
-                      </h4>
-                      <p style={{ fontSize: '0.8rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
-                        <Phone size={12} /> <a href={`tel:${lead.mobile}`} style={{ color: '#1f2937', textDecoration: 'none', fontWeight: 500 }}>{lead.mobile}</a>
-                        {lead.email ? ` | ✉️ ${lead.email}` : ''}
-                      </p>
-                      <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '2px' }}>
-                        <strong>Aadhar:</strong> {lead.aadhar || 'Not Provided'} | <strong>Source:</strong> {lead.sourceType || 'Walk-In'} {lead.address && lead.address !== 'N/A' ? `| 📍 ${lead.address}` : ''}
-                      </p>
-                    </div>
-
-                    <div style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                        <span style={{ color: '#6b7280' }}>Vehicle Choice:</span>
-                        <strong>{lead.vehicle} {lead.color ? `(${lead.color})` : ''}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                        <span style={{ color: '#6b7280' }}>Ex-Showroom Base:</span>
-                        <strong style={{ color: '#059669' }}>₹{Number(lead.price || 0).toLocaleString('en-IN')}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#6b7280' }}>Assigned Executive:</span>
-                        <strong>{lead.executive || 'Unassigned'}</strong>
-                      </div>
-                    </div>
-
-                    {lead.followupDate && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#047857', fontWeight: 600 }}>
-                        <Calendar size={12} /> Follow-up Scheduled: {lead.followupDate}
-                      </div>
-                    )}
-
-                    {lead.note && (
-                      <p style={{ fontSize: '0.75rem', color: '#6b7280', backgroundColor: '#f3f4f6', padding: '6px 10px', borderRadius: '4px' }}>
-                        <strong>Note:</strong> {lead.note}
-                      </p>
-                    )}
-                  </div>
-                ))
+                  ))}
+                </div>
               ) : (
-                <div style={{ padding: '50px 20px', textAlign: 'center', color: '#9ca3af' }}>
-                  <Clipboard size={48} strokeWidth={1} style={{ marginBottom: '12px' }} />
-                  <p style={{ fontSize: '0.9rem', fontWeight: 500, color: '#6b7280' }}>No leads found matching current filter or search.</p>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    style={{ marginTop: '12px' }}
-                    onClick={handleOpenAddLead}
-                  >
-                    + Create First Lead
-                  </button>
+                <div style={{ padding: '30px 20px', textAlign: 'center', color: '#9ca3af', fontSize: '0.8rem' }}>
+                  <Clipboard size={32} strokeWidth={1} style={{ marginBottom: '8px' }} />
+                  <p>No sale leads found matching current filter or search.</p>
                 </div>
               )}
             </div>
           </div>
+
+          {/* Right Column: Lead Document Preview & Follow-Up Sheet */}
+          {showPreviews && (
+            <div className="card">
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 className="card-title">
+                  <Clipboard size={18} style={{ color: '#059669' }} /> Lead Profile & Follow-Up
+                </h3>
+                {generatedLead && (
+                  <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                    Lead #{generatedLead.id}
+                  </span>
+                )}
+              </div>
+              <div className="card-body">
+                {generatedLead ? (
+                  <div className="invoice-container">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #059669', paddingBottom: '12px' }}>
+                      <div>
+                        <div className="invoice-title" style={{ textAlign: 'left', margin: 0, fontSize: '1.25rem' }}>NANDHI MOTORS</div>
+                        <p style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 600, margin: '2px 0 0' }}>
+                          Customer Sales Lead Sheet
+                        </p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span className="badge" style={{
+                          backgroundColor: generatedLead.leadType === 'Hot' ? '#ef4444' : '#059669',
+                          color: '#fff',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700
+                        }}>
+                          {generatedLead.leadType === 'Hot' ? '🔥 HOT PROSPECT' : `${generatedLead.leadType} LEAD`}
+                        </span>
+                        <div style={{ fontSize: '0.74rem', color: '#6b7280', marginTop: '4px' }}>
+                          Entry Date: <strong>{generatedLead.entryDate || generatedLead.createdOn || 'Recent'}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2-Column Info Grid */}
+                    <div className="invoice-grid-2" style={{ marginTop: '16px' }}>
+                      <div>
+                        <div className="section-title">Customer Particulars</div>
+                        <p><strong>Name:</strong> {generatedLead.name}</p>
+                        <p><strong>Mobile:</strong> <a href={`tel:${generatedLead.mobile}`} style={{ color: '#059669', fontWeight: 600, textDecoration: 'none' }}>{generatedLead.mobile}</a></p>
+                        {generatedLead.email && <p><strong>Email:</strong> {generatedLead.email}</p>}
+                        {generatedLead.address && <p><strong>Address:</strong> {generatedLead.address}</p>}
+                        {generatedLead.aadhar && <p><strong>Aadhaar:</strong> {generatedLead.aadhar}</p>}
+                        <p><strong>Enquiry Source:</strong> {generatedLead.sourceType || 'Walk-In'}</p>
+                      </div>
+
+                      <div>
+                        <div className="section-title">Vehicle Choice & Dealership Info</div>
+                        <p><strong>Model:</strong> {generatedLead.vehicle}</p>
+                        <p><strong>Color:</strong> {generatedLead.color || 'Standard'}</p>
+                        <p><strong>Estimated Price:</strong> ₹{Number(generatedLead.price || 0).toLocaleString('en-IN')}</p>
+                        <p><strong>Executive:</strong> {generatedLead.executive || 'Unassigned'}</p>
+                        <p><strong>Status:</strong> {generatedLead.status || 'Entered'}</p>
+                      </div>
+                    </div>
+
+                    {/* Follow-up Status Banner */}
+                    <div style={{
+                      margin: '16px 0',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      backgroundColor: generatedLead.reminder === 'OFF' ? '#f9fafb' : '#f0fdf4',
+                      border: '1px solid',
+                      borderColor: generatedLead.reminder === 'OFF' ? '#e5e7eb' : '#bbf7d0',
+                      fontSize: '0.8rem'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700, color: generatedLead.reminder === 'OFF' ? '#6b7280' : '#047857' }}>
+                          {generatedLead.reminder === 'OFF' ? '🔕 Follow-up Reminder OFF' : '🔔 Follow-up Reminder Active'}
+                        </span>
+                        {generatedLead.followupDate && (
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151' }}>
+                            Due: {generatedLead.followupDate} {generatedLead.reminderTime ? `at ${generatedLead.reminderTime}` : ''}
+                          </span>
+                        )}
+                      </div>
+                      {generatedLead.note && (
+                        <p style={{ margin: '6px 0 0', fontSize: '0.76rem', color: '#4b5563' }}>
+                          <strong>Remarks:</strong> {generatedLead.note}
+                        </p>
+                      )}
+                    </div>
+
+                      {/* Action Buttons */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginTop: '14px' }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 12px' }}
+                        onClick={() => handleConvertToQuotation(generatedLead)}
+                      >
+                        <Calculator size={14} /> Convert to Quote
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 12px' }}
+                        onClick={() => handleOpenEditLead(generatedLead)}
+                      >
+                        <Edit2 size={14} /> Edit Lead
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '30px', textAlign: 'center', color: '#9ca3af' }}>
+                    <Clipboard size={36} strokeWidth={1} style={{ marginBottom: '8px' }} />
+                    <p>Select a sale lead from the ledger on the left to preview.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* SUBTAB 2: QUOTATION CALCULATOR */}
-      {activeSubTab === 'quotation' && (
+      {/* SUBTAB 2: ADVANCED & NEAT QUOTATION CALCULATOR */}
+      {currentSubTab === 'quotation' && (
         <div style={{
           display: 'grid',
           gridTemplateColumns: showPreviews ? '1.2fr 1fr' : '1fr',
           gap: '24px',
           animation: 'fadeIn 0.2s ease'
         }}>
-          {/* Left Column: Saved On-Road Quotations */}
+          {/* LEFT COLUMN: Saved Quotations Ledger */}
           <div className="card">
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 className="card-title">Saved On-Road Quotations</h3>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={handleOpenAddQuote}
-              >
-                + Create Quotation
-              </button>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <h3 className="card-title">Saved Quotations</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="quick-search">
+                  <Search size={14} className="quick-search-icon" />
+                  <input
+                    type="text"
+                    placeholder="Search name/phone/ID..."
+                    style={{ width: '160px', padding: '6px 10px 6px 28px', fontSize: '0.78rem' }}
+                    value={quoteSearchQuery}
+                    onChange={(e) => setQuoteSearchQuery(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={handleOpenAddQuote}
+                >
+                  <Calculator size={14} /> + New Quotation
+                </button>
+              </div>
             </div>
-            <div className="card-body" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+            <div className="card-body" style={{ maxHeight: '680px', overflowY: 'auto', padding: '12px' }}>
+              {/* Quotation Stats Summary matching Invoice style */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '8px',
+                backgroundColor: '#f9fafb',
+                padding: '10px',
+                borderRadius: '6px',
+                border: '1px solid #e5e7eb',
+                marginBottom: '10px',
+                textAlign: 'center'
+              }}>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Total Quotes</span>
+                  <strong style={{ fontSize: '0.9rem', color: '#1f2937' }}>{quoteSummaryStats.totalCount}</strong>
+                </div>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Avg Quote</span>
+                  <strong style={{ fontSize: '0.9rem', color: '#059669' }}>₹{quoteSummaryStats.avgVal.toLocaleString('en-IN')}</strong>
+                </div>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Pipeline Total</span>
+                  <strong style={{ fontSize: '0.9rem', color: '#1f2937' }}>₹{quoteSummaryStats.totalSum.toLocaleString('en-IN')}</strong>
+                </div>
+              </div>
+
               {quoteSuccessMsg && (
                 <div style={{
                   padding: '10px 14px',
@@ -1250,39 +1624,19 @@ export default function LeadsManagement({
                   fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px'
+                  gap: '8px',
+                  marginBottom: '10px'
                 }}>
-                  <span>✅</span> <span>{quoteSuccessMsg}</span>
+                  <CheckCircle size={16} color="#059669" />
+                  <span>{quoteSuccessMsg}</span>
                 </div>
               )}
 
-              {/* Summary Bar */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
-                gap: '10px',
-                backgroundColor: '#f9fafb',
-                padding: '10px',
-                borderRadius: '6px',
-                border: '1px solid #e5e7eb',
-                textAlign: 'center'
-              }}>
-                <div>
-                  <span style={{ display: 'block', fontSize: '0.7rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Total Quotes</span>
-                  <strong style={{ fontSize: '1.1rem', color: '#1f2937' }}>{quoteSummaryStats.totalCount}</strong>
-                </div>
-                <div>
-                  <span style={{ display: 'block', fontSize: '0.7rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Average Quote Value</span>
-                  <strong style={{ fontSize: '1.1rem', color: '#059669' }}>₹{quoteSummaryStats.avgVal.toLocaleString('en-IN')}</strong>
-                </div>
-              </div>
-
-              {/* Scrollable list */}
-              <div style={{ maxHeight: '420px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {quotations && quotations.length > 0 ? (
-                  quotations.map((q, idx) => (
+              {filteredQuotations && filteredQuotations.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {filteredQuotations.map((q, idx) => (
                     <div
-                      key={idx}
+                      key={q.quoteId || idx}
                       onClick={() => setGeneratedQuote(q)}
                       style={{
                         display: 'flex',
@@ -1291,43 +1645,44 @@ export default function LeadsManagement({
                         padding: '10px 12px',
                         border: '1px solid #e5e7eb',
                         borderRadius: '6px',
-                        backgroundColor: (generatedQuote?.quoteId === q.quoteId) ? '#f0fdf4' : '#ffffff',
-                        borderColor: (generatedQuote?.quoteId === q.quoteId) ? '#86efac' : '#e5e7eb',
+                        backgroundColor: generatedQuote?.quoteId === q.quoteId ? '#f0fdf4' : '#ffffff',
+                        borderColor: generatedQuote?.quoteId === q.quoteId ? '#86efac' : '#e5e7eb',
                         cursor: 'pointer',
                         fontSize: '0.8rem',
                         transition: 'all 0.15s ease'
                       }}
                     >
                       <div>
-                        <strong>Quote #{q.quoteId}</strong> | {q.customerName || 'Walk-in'}<br />
-                        <span style={{ color: '#6b7280' }}>Date: {q.createdOn} | {q.vehicleModel} ({q.vehicleColor})</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <strong>Quote #{q.quoteId}</strong> | <span style={{ fontWeight: 600 }}>{q.customerName || 'Walk-in Customer'}</span>
+                          {q.gstRate !== undefined && (
+                            <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', backgroundColor: '#ecfdf5', color: '#047857', fontWeight: 600, border: '1px solid #a7f3d0' }}>
+                              GST {q.gstRate}%
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ color: '#6b7280', fontSize: '0.74rem' }}>
+                          Date: {q.createdOn || 'Recent'} | 📞 {q.customerPhone || 'No phone'} | 🏍️ {q.vehicleModel} {q.vehicleColor ? `(${q.vehicleColor})` : ''}
+                        </span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
-                        <strong style={{ color: '#059669', marginRight: '4px' }}>₹{Number(q.total || 0).toLocaleString('en-IN')}</strong>
-                        
-                        {/* Convert to Invoice Button */}
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          style={{ padding: '4px 8px', color: '#059669', borderColor: '#a7f3d0', backgroundColor: '#ecfdf5', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.75rem', fontWeight: 600 }}
-                          onClick={() => handleConvertQuoteToInvoice(q)}
-                          title="Convert this Quotation to Tax Invoice"
-                        >
-                          <FileText size={12} /> Convert to Invoice
-                        </button>
 
-                        {/* WhatsApp Share Button */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                        <strong style={{ color: '#059669', marginRight: '4px', fontSize: '0.88rem' }}>
+                          ₹{Number(q.total || 0).toLocaleString('en-IN')}
+                        </strong>
+
+                        {/* WhatsApp Share */}
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm"
                           style={{ padding: '4px 8px', color: '#16a34a', borderColor: '#bbf7d0', backgroundColor: '#f0fdf4' }}
                           onClick={() => handleShareQuoteWhatsApp(q)}
-                          title="Share Quotation on WhatsApp"
+                          title="Share Quotation PDF on WhatsApp"
                         >
                           <MessageCircle size={13} />
                         </button>
 
-                        {/* Edit Quotation Button */}
+                        {/* Edit Button */}
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm"
@@ -1347,21 +1702,37 @@ export default function LeadsManagement({
                             setGeneratedQuote(q);
                             setPrintModalConfig({ isOpen: true, type: 'quotation', data: q });
                           }}
-                          title="Print Preview Popup"
+                          title="Print / View Quotation PDF"
                         >
                           <Printer size={12} />
                         </button>
 
-                        {/* Delete Quotation Button */}
+                        {/* Convert to Invoice - Icon only placed after Print */}
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{
+                            padding: '4px 8px',
+                            color: '#059669',
+                            borderColor: '#a7f3d0',
+                            backgroundColor: '#ecfdf5'
+                          }}
+                          onClick={() => handleConvertQuoteToInvoice(q)}
+                          title="Convert to Invoice"
+                        >
+                          <Receipt size={13} />
+                        </button>
+
+                        {/* Delete Button */}
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm"
                           style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#fca5a5' }}
                           onClick={() => {
-                            if (confirm(`Are you sure you want to delete Quotation ${q.quoteId}?`)) {
+                            if (confirm(`Are you sure you want to delete Quotation #${q.quoteId}?`)) {
                               deleteQuotation(q.quoteId);
                               if (generatedQuote?.quoteId === q.quoteId) {
-                                  setGeneratedQuote(null);
+                                setGeneratedQuote(null);
                               }
                             }
                           }}
@@ -1371,149 +1742,343 @@ export default function LeadsManagement({
                         </button>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div style={{ textAlign: 'center', padding: '30px 16px', color: '#9ca3af', fontSize: '0.85rem' }}>
-                    <p style={{ marginBottom: '12px' }}>No saved quotations yet.</p>
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      onClick={handleOpenAddQuote}
-                    >
-                      + Create First Quotation
-                    </button>
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '30px 20px', color: '#9ca3af', fontSize: '0.8rem' }}>
+                  <Clipboard size={32} strokeWidth={1} style={{ marginBottom: '8px' }} />
+                  <p>No quotations found matching search.</p>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Quotation Preview Card */}
-          {showPreviews && (
-            <div className="card">
-              <div className="card-header">
-                <h3 className="card-title">Quotation PDF Preview</h3>
-              </div>
-              <div className="card-body">
-                {generatedQuote ? (
-                  <div className="invoice-container">
-                    <div className="invoice-title">NANDHI MOTORS</div>
-                    <p style={{ textAlign: 'center', fontSize: '0.75rem', color: '#6b7280', marginBottom: '18px' }}>
-                      128, Bangalore Main Road, Hosur - 635109
-                    </p>
-                    
-                    <div className="invoice-meta">
-                      <div>
-                        <strong>Quoted To:</strong> {generatedQuote.customerName || 'Walk-in Customer'}<br />
-                        <strong>Phone No:</strong> {generatedQuote.customerPhone || 'N/A'}
+            {/* RIGHT COLUMN: Executive Quotation Preview Sheet */}
+            {showPreviews && (
+              <div className="card" style={{ margin: 0, overflow: 'hidden' }}>
+                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px' }}>
+                  <h3 className="card-title" style={{ fontSize: '1.05rem', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileCode size={18} style={{ color: '#059669' }} /> Live Quotation Document Preview
+                  </h3>
+                  {generatedQuote && (
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#059669', backgroundColor: '#ecfdf5', padding: '3px 8px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                      Quote #{generatedQuote.quoteId}
+                    </span>
+                  )}
+                </div>
+
+                <div className="card-body" style={{ padding: '20px' }}>
+                  {generatedQuote ? (
+                    <div style={{
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '12px',
+                      padding: '24px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '20px'
+                    }}>
+                      {/* Document Top Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #059669', paddingBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                        <div>
+                          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#111827', letterSpacing: '-0.5px' }}>
+                            NANDHI MOTORS
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Authorized Two-Wheeler Sales & Service
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>
+                            128, Bangalore Main Road, Hosur - 635109 | 📞 +91 98421 55670
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{
+                            display: 'inline-block',
+                            backgroundColor: '#ecfdf5',
+                            color: '#047857',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            border: '1px solid #bbf7d0'
+                          }}>
+                            ON-ROAD PRICE QUOTATION
+                          </span>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>
+                            Ref: <strong>{generatedQuote.quoteId}</strong> | Date: <strong>{generatedQuote.createdOn || new Date().toLocaleDateString('en-IN')}</strong>
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <strong>Date:</strong> {generatedQuote.createdOn || new Date().toLocaleDateString('en-IN')}<br />
-                        <strong>Vehicle:</strong> {generatedQuote.vehicleModel}<br />
-                        <strong>Colour:</strong> {generatedQuote.vehicleColor}
+
+                      {/* 2-Column Info Grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                        <div style={{ backgroundColor: '#f9fafb', padding: '12px 14px', borderRadius: '8px', border: '1px solid #f3f4f6' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                            Customer Particulars
+                          </span>
+                          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#1f2937' }}>
+                            {generatedQuote.customerName || 'Walk-in Customer'}
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: '#4b5563', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span>📞 {generatedQuote.customerPhone || 'N/A'}</span>
+                            {generatedQuote.customerEmail && <span>| ✉️ {generatedQuote.customerEmail}</span>}
+                          </div>
+                          {generatedQuote.customerAddress && (
+                            <div style={{ fontSize: '0.76rem', color: '#4b5563', marginTop: '3px' }}>
+                              📍 <strong>Address:</strong> {generatedQuote.customerAddress}
+                            </div>
+                          )}
+                          {(generatedQuote.customerAadhar || generatedQuote.customerGst) && (
+                            <div style={{ fontSize: '0.74rem', color: '#6b7280', marginTop: '3px' }}>
+                              {generatedQuote.customerAadhar && <span>Aadhar: <strong>{generatedQuote.customerAadhar}</strong> </span>}
+                              {generatedQuote.customerGst && <span>| GSTIN: <strong>{generatedQuote.customerGst}</strong></span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ backgroundColor: '#f9fafb', padding: '12px 14px', borderRadius: '8px', border: '1px solid #f3f4f6' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                            Vehicle Choice & Specs
+                          </span>
+                          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#059669' }}>
+                            {generatedQuote.vehicleModel || 'Two-Wheeler'}
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: '#4b5563', marginTop: '3px' }}>
+                            Color: <strong>{generatedQuote.vehicleColor || 'Standard'}</strong>
+                          </div>
+                          <div style={{ fontSize: '0.76rem', color: '#6b7280', marginTop: '3px' }}>
+                            Validity: <strong>7 Days from issuance</strong>
+                          </div>
+                          {generatedQuote.executive && (
+                            <div style={{ fontSize: '0.76rem', color: '#374151', marginTop: '3px' }}>
+                              Executive: <strong>{generatedQuote.executive}</strong>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Itemized Price Component Table */}
+                      <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                          <thead>
+                            <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                              <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 700, color: '#374151' }}>Price Component Description</th>
+                              <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 700, color: '#374151' }}>Amount (₹)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '9px 14px', color: '#374151' }}>Ex-Showroom Base Vehicle Price</td>
+                              <td style={{ textAlign: 'right', padding: '9px 14px', fontWeight: 600, color: '#111827' }}>
+                                ₹{Number(generatedQuote.exShowroom || 0).toLocaleString('en-IN')}
+                              </td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid #f3f4f6', backgroundColor: '#f0fdf4' }}>
+                              <td style={{ padding: '9px 14px', color: '#047857', fontWeight: 600 }}>
+                                Goods & Services Tax (GST {generatedQuote.gstRate !== undefined ? generatedQuote.gstRate : 5}%)
+                              </td>
+                              <td style={{ textAlign: 'right', padding: '9px 14px', fontWeight: 700, color: '#047857' }}>
+                                +₹{Number(generatedQuote.gstAmount !== undefined ? generatedQuote.gstAmount : Math.round(Number(generatedQuote.exShowroom || 0) * ((generatedQuote.gstRate !== undefined ? generatedQuote.gstRate : 5) / 100))).toLocaleString('en-IN')}
+                              </td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid #f3f4f6', backgroundColor: '#fafafa' }}>
+                              <td style={{ padding: '9px 14px', color: '#374151' }}>RTO Registration, Road Tax & HSRP Plates</td>
+                              <td style={{ textAlign: 'right', padding: '9px 14px', fontWeight: 600, color: '#111827' }}>
+                                ₹{Number(generatedQuote.rto || 0).toLocaleString('en-IN')}
+                              </td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '9px 14px', color: '#374151' }}>5-Year Comprehensive Insurance Premium</td>
+                              <td style={{ textAlign: 'right', padding: '9px 14px', fontWeight: 600, color: '#111827' }}>
+                                ₹{Number(generatedQuote.insurance || 0).toLocaleString('en-IN')}
+                              </td>
+                            </tr>
+                            <tr style={{ borderBottom: '1px solid #f3f4f6', backgroundColor: '#fafafa' }}>
+                              <td style={{ padding: '9px 14px', color: '#374151' }}>Standard Accessories Kit & ISI Helmet</td>
+                              <td style={{ textAlign: 'right', padding: '9px 14px', fontWeight: 600, color: '#111827' }}>
+                                ₹{Number(generatedQuote.accessories || 0).toLocaleString('en-IN')}
+                              </td>
+                            </tr>
+                            <tr style={{ borderBottom: Number(generatedQuote.discount || 0) > 0 ? '1px solid #f3f4f6' : 'none' }}>
+                              <td style={{ padding: '9px 14px', color: '#374151' }}>Logistics, Handling & Showroom PDI</td>
+                              <td style={{ textAlign: 'right', padding: '9px 14px', fontWeight: 600, color: '#111827' }}>
+                                ₹{Number(generatedQuote.handling || 0).toLocaleString('en-IN')}
+                              </td>
+                            </tr>
+                            {Number(generatedQuote.discount || 0) > 0 && (
+                              <tr style={{ backgroundColor: '#fef2f2' }}>
+                                <td style={{ padding: '9px 14px', color: '#dc2626', fontWeight: 600 }}>Special Dealer Discount (-)</td>
+                                <td style={{ textAlign: 'right', padding: '9px 14px', fontWeight: 700, color: '#dc2626' }}>
+                                  -₹{Number(generatedQuote.discount).toLocaleString('en-IN')}
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Net On-Road Grand Total Banner */}
+                      <div style={{
+                        backgroundColor: '#059669',
+                        color: '#ffffff',
+                        padding: '16px 20px',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        boxShadow: '0 4px 10px rgba(5,150,105,0.25)'
+                      }}>
+                        <div>
+                          <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', opacity: 0.9, letterSpacing: '0.5px' }}>
+                            Net Payable On-Road Price
+                          </span>
+                          <div style={{ fontSize: '0.8rem', opacity: 0.85 }}>
+                            Includes standard taxes, registration & levies
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '1.6rem', fontWeight: 800 }}>
+                          ₹{Number(generatedQuote.total || 0).toLocaleString('en-IN')}
+                        </div>
+                      </div>
+
+                      {/* Dealership Quotation Terms & Conditions */}
+                      <div style={{
+                        backgroundColor: '#f9fafb',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        padding: '12px 14px',
+                        fontSize: '0.76rem',
+                        lineHeight: 1.5,
+                        color: '#4b5563'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                          <span style={{ fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.74rem' }}>
+                            Terms & Conditions
+                          </span>
+                          <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontStyle: 'italic' }}>
+                            🔒 Managed permanently in Settings
+                          </span>
+                        </div>
+                        <div style={{ whiteSpace: 'pre-wrap', color: '#374151', fontSize: '0.75rem', lineHeight: 1.5 }}>
+                          {companyProfile?.quotationTerms || `1. Prices quoted are valid for 7 days from the date of issuance and subject to manufacturer price revisions.
+2. Final delivery is subject to availability of vehicle stock and color chosen at the time of final booking.
+3. RTO registration, road tax, and insurance charges are subject to statutory revisions by Government authorities.
+4. Full on-road payment is required prior to vehicle invoicing and registration dispatch.
+5. Standard accessories and helmet are supplied according to dealership delivery policy.`}
+                        </div>
+                      </div>
+
+                      {/* Interactive Actions Dock */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', paddingTop: '6px' }}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{
+                            padding: '10px',
+                            fontSize: '0.84rem',
+                            fontWeight: 600,
+                            backgroundColor: '#f0fdf4',
+                            borderColor: '#86efac',
+                            color: '#15803d',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                          onClick={() => handleShareQuoteWhatsApp(generatedQuote)}
+                          title="Share Official Quotation on WhatsApp"
+                        >
+                          <MessageCircle size={15} /> Send WhatsApp
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{
+                            padding: '10px',
+                            fontSize: '0.84rem',
+                            fontWeight: 600,
+                            backgroundColor: '#eff6ff',
+                            borderColor: '#93c5fd',
+                            color: '#1d4ed8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                          onClick={() => handleEditQuotation(generatedQuote)}
+                          title="Edit Quotation Parameters"
+                        >
+                          <Edit2 size={15} /> Edit Quote
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{
+                            padding: '10px',
+                            fontSize: '0.84rem',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                          onClick={() => setPrintModalConfig({ isOpen: true, type: 'quotation', data: generatedQuote })}
+                          title="Open Print & PDF Preview Modal"
+                        >
+                          <Printer size={15} /> Print / PDF
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{
+                            padding: '10px 14px',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '7px',
+                            backgroundColor: '#059669',
+                            borderColor: '#047857',
+                            boxShadow: '0 2px 6px rgba(5,150,105,0.25)'
+                          }}
+                          onClick={() => handleConvertQuoteToInvoice(generatedQuote)}
+                          title="Convert this Quotation to a Tax Invoice"
+                        >
+                          <Receipt size={16} />
+                          <span>Convert to Invoice</span>
+                        </button>
                       </div>
                     </div>
-
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', margin: '18px 0' }}>
-                      <thead>
-                        <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1.5px solid #000' }}>
-                          <th style={{ textAlign: 'left', padding: '6px 8px' }}>Price Component</th>
-                          <th style={{ textAlign: 'right', padding: '6px 8px' }}>Amount (₹)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr style={{ borderBottom: '1px dotted #ccc' }}>
-                          <td style={{ padding: '6px 8px' }}>Ex-Showroom Base Price</td>
-                          <td style={{ textAlign: 'right', padding: '6px 8px' }}>₹{Number(generatedQuote.exShowroom || 0).toLocaleString('en-IN')}</td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px dotted #ccc' }}>
-                          <td style={{ padding: '6px 8px' }}>RTO Registration, Tax & Plates</td>
-                          <td style={{ textAlign: 'right', padding: '6px 8px' }}>₹{Number(generatedQuote.rto || 0).toLocaleString('en-IN')}</td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px dotted #ccc' }}>
-                          <td style={{ padding: '6px 8px' }}>Comprehensive Insurance</td>
-                          <td style={{ textAlign: 'right', padding: '6px 8px' }}>₹{Number(generatedQuote.insurance || 0).toLocaleString('en-IN')}</td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px dotted #ccc' }}>
-                          <td style={{ padding: '6px 8px' }}>Showroom Accessories / Helmet</td>
-                          <td style={{ textAlign: 'right', padding: '6px 8px' }}>₹{Number(generatedQuote.accessories || 0).toLocaleString('en-IN')}</td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px dotted #ccc' }}>
-                          <td style={{ padding: '6px 8px' }}>Logistics, Handling & Number Plate</td>
-                          <td style={{ textAlign: 'right', padding: '6px 8px' }}>₹{Number(generatedQuote.handling || 0).toLocaleString('en-IN')}</td>
-                        </tr>
-                        {Number(generatedQuote.discount || 0) > 0 && (
-                          <tr style={{ color: '#ef4444', borderBottom: '1px dotted #ccc' }}>
-                            <td style={{ padding: '6px 8px' }}>Special Dealer Discount (-)</td>
-                            <td style={{ textAlign: 'right', padding: '6px 8px' }}>-₹{Number(generatedQuote.discount).toLocaleString('en-IN')}</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-
-                    <div className="invoice-totals">
-                      <div className="invoice-row bold" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '1rem', borderBottom: '1px solid #000' }}>
-                        <span>Consolidated On-Road:</span>
-                        <span style={{ color: '#059669' }}>₹{Number(generatedQuote.total || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: '24px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '340px', color: '#9ca3af', textAlign: 'center', padding: '40px 20px' }}>
+                      <Calculator size={52} strokeWidth={1} style={{ marginBottom: '14px', color: '#059669' }} />
+                      <h4 style={{ fontSize: '1.05rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Select a Quotation</h4>
+                      <p style={{ fontSize: '0.85rem', color: '#6b7280', maxWidth: '340px', marginBottom: '16px' }}>
+                        Click on any saved quotation from the ledger on the left to preview its breakdown, or generate a new price quote.
+                      </p>
                       <button
                         type="button"
                         className="btn btn-primary btn-sm"
-                        style={{ flex: 1, minWidth: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', backgroundColor: '#059669', color: '#fff', fontWeight: 600 }}
-                        onClick={() => handleConvertQuoteToInvoice(generatedQuote)}
+                        onClick={handleOpenAddQuote}
                       >
-                        <FileText size={14} /> Convert to Tax Invoice
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        style={{ flex: 1, minWidth: '130px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', backgroundColor: '#f0fdf4', borderColor: '#86efac', color: '#15803d' }}
-                        onClick={() => handleShareQuoteWhatsApp(generatedQuote)}
-                      >
-                        <MessageCircle size={14} /> Send WhatsApp
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        style={{ flex: 1, minWidth: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', backgroundColor: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8' }}
-                        onClick={() => handleEditQuotation(generatedQuote)}
-                      >
-                        <Edit2 size={14} /> Edit Quote
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        style={{ flex: 1, minWidth: '120px' }}
-                        onClick={() => setPrintModalConfig({ isOpen: true, type: 'quotation', data: generatedQuote })}
-                      >
-                        <Printer size={14} /> Print Preview
+                        + Create New Quotation
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '240px', color: '#9ca3af', textAlign: 'center' }}>
-                    <Calculator size={48} strokeWidth={1} style={{ marginBottom: '12px', color: '#059669' }} />
-                    <p style={{ marginBottom: '12px' }}>Select a quotation from the ledger on the left to preview, or create a new one.</p>
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      onClick={handleOpenAddQuote}
-                    >
-                      + Create New Quotation
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
 
       {/* SUBTAB 3: BOOKING */}
-      {activeSubTab === 'booking' && (
+      {currentSubTab === 'booking' && (
         <div style={{
           display: 'grid',
           gridTemplateColumns: showPreviews ? '1.2fr 1fr' : '1fr',
@@ -1553,8 +2118,8 @@ export default function LeadsManagement({
               {/* Summary Bar */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
-                gap: '10px',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '8px',
                 backgroundColor: '#f9fafb',
                 padding: '10px',
                 borderRadius: '6px',
@@ -1562,12 +2127,19 @@ export default function LeadsManagement({
                 textAlign: 'center'
               }}>
                 <div>
-                  <span style={{ display: 'block', fontSize: '0.7rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Total Bookings</span>
-                  <strong style={{ fontSize: '1.1rem', color: '#1f2937' }}>{bookingSummaryStats.totalCount}</strong>
+                  <span style={{ display: 'block', fontSize: '0.68rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Total Bookings</span>
+                  <strong style={{ fontSize: '1rem', color: '#1f2937' }}>{bookingSummaryStats.totalCount}</strong>
                 </div>
                 <div>
-                  <span style={{ display: 'block', fontSize: '0.7rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Advance Collected</span>
-                  <strong style={{ fontSize: '1.1rem', color: '#059669' }}>₹{bookingSummaryStats.totalAdvance.toLocaleString('en-IN')}</strong>
+                  <span style={{ display: 'block', fontSize: '0.68rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Active Advance</span>
+                  <strong style={{ fontSize: '1rem', color: '#059669' }}>₹{bookingSummaryStats.totalAdvance.toLocaleString('en-IN')}</strong>
+                </div>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.68rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Status</span>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, marginTop: '2px', display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                    <span style={{ color: '#059669' }}>{bookingSummaryStats.convertedCount || 0} Sold</span>
+                    <span style={{ color: '#dc2626' }}>{bookingSummaryStats.returnedCount || 0} Ret.</span>
+                  </div>
                 </div>
               </div>
 
@@ -1576,7 +2148,7 @@ export default function LeadsManagement({
                 {bookings && bookings.length > 0 ? (
                   bookings.map((b, idx) => (
                     <div
-                      key={idx}
+                      key={b.id || idx}
                       onClick={() => setGeneratedBooking(b)}
                       style={{
                         display: 'flex',
@@ -1585,46 +2157,107 @@ export default function LeadsManagement({
                         padding: '10px 12px',
                         border: '1px solid #e5e7eb',
                         borderRadius: '6px',
-                        backgroundColor: generatedBooking?.id === b.id ? '#f0fdf4' : '#ffffff',
-                        borderColor: generatedBooking?.id === b.id ? '#86efac' : '#e5e7eb',
+                        backgroundColor: generatedBooking?.id === b.id ? '#f0fdf4' : b.status === 'Returned' ? '#fdf2f2' : '#ffffff',
+                        borderColor: generatedBooking?.id === b.id ? '#86efac' : b.status === 'Returned' ? '#fecaca' : '#e5e7eb',
                         cursor: 'pointer',
                         fontSize: '0.8rem',
                         transition: 'all 0.15s ease'
                       }}
                     >
                       <div>
-                        <strong>Booking #{b.id}</strong> | {b.customerName}<br />
-                        <span style={{ color: '#6b7280' }}>Date: {b.bookingDate} | {b.vehicleModel} ({b.vehicleColor})</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <strong>Booking #{b.id}</strong>
+                          <span>|</span>
+                          <span style={{ fontWeight: 600 }}>{b.customerName}</span>
+                          {b.status === 'Returned' && (
+                            <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#fee2e2', color: '#dc2626', fontWeight: 700 }}>
+                              Returned
+                            </span>
+                          )}
+                          {b.status === 'Converted' && (
+                            <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#dcfce7', color: '#059669', fontWeight: 700 }}>
+                              Converted
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ color: '#6b7280', fontSize: '0.74rem' }}>Date: {b.bookingDate || b.createdOn} | {b.vehicleModel} ({b.vehicleColor})</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
-                        <strong style={{ color: '#059669', marginRight: '4px' }}>₹{Number(b.bookingAmount || 0).toLocaleString('en-IN')}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                        <strong style={{ 
+                          color: b.status === 'Returned' ? '#9ca3af' : '#059669', 
+                          marginRight: '6px',
+                          textDecoration: b.status === 'Returned' ? 'line-through' : 'none'
+                        }}>
+                          ₹{Number(b.bookingAmount || 0).toLocaleString('en-IN')}
+                        </strong>
+
+                        {/* 1. Print / Preview Icon */}
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm"
-                          style={{ padding: '4px 8px' }}
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '6px',
+                            border: '1px solid #d1d5db',
+                            backgroundColor: '#ffffff',
+                            color: '#374151'
+                          }}
                           onClick={() => {
                             setGeneratedBooking(b);
                             setPrintModalConfig({ isOpen: true, type: 'booking', data: b });
                           }}
-                          title="Print Preview Popup"
+                          title="Print Preview / Share Booking Slip"
                         >
-                          <Printer size={12} />
+                          <Printer size={15} />
                         </button>
+
+                        {/* 2. Convert to Sale / Invoice Icon */}
                         <button
                           type="button"
-                          className="btn btn-secondary btn-sm"
-                          style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#fca5a5' }}
-                          onClick={() => {
-                            if (confirm(`Are you sure you want to delete Booking ${b.id}?`)) {
-                              deleteBooking(b.id);
-                              if (generatedBooking?.id === b.id) {
-                                setGeneratedBooking(null);
-                              }
-                            }
+                          className="btn btn-sm"
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '6px',
+                            border: '1px solid #059669',
+                            backgroundColor: '#059669',
+                            color: '#ffffff'
                           }}
-                          title="Delete Booking"
+                          onClick={() => handleConvertBookingToInvoice(b)}
+                          title="Convert to Sale / Tax Invoice"
                         >
-                          <Trash2 size={12} />
+                          <Receipt size={15} />
+                        </button>
+
+                        {/* 3. Return / Refund Advance Icon */}
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '6px',
+                            border: b.status === 'Returned' ? '1px solid #f59e0b' : '1px solid #fca5a5',
+                            backgroundColor: b.status === 'Returned' ? '#fef3c7' : '#fee2e2',
+                            color: b.status === 'Returned' ? '#b45309' : '#dc2626'
+                          }}
+                          onClick={() => handleReturnBooking(b)}
+                          title={b.status === 'Returned' ? 'Reactivate Booking (Undo Return)' : 'Return / Refund Booking Advance'}
+                        >
+                          <RotateCcw size={15} />
                         </button>
                       </div>
                     </div>
@@ -1727,22 +2360,45 @@ export default function LeadsManagement({
                       Thank you for choosing Nandhi Motors!
                     </div>
 
-                    <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
+                    <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
-                        style={{ flex: 1 }}
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                         onClick={() => setPrintModalConfig({ isOpen: true, type: 'booking', data: generatedBooking })}
+                        title="Print Preview / Share Slip"
                       >
-                        <Printer size={14} /> Print Preview & Print
+                        <Printer size={15} />
+                        <span>Print</span>
                       </button>
                       <button
                         type="button"
-                        className="btn btn-primary btn-sm"
-                        style={{ flex: 1 }}
-                        onClick={clearBookingForm}
+                        className="btn btn-success btn-sm"
+                        style={{ flex: 1.3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', backgroundColor: '#059669', color: '#ffffff', border: 'none' }}
+                        onClick={() => handleConvertBookingToInvoice(generatedBooking)}
+                        title="Convert this Booking directly into a Sale Invoice"
                       >
-                        New Booking
+                        <Receipt size={15} />
+                        <span>Convert to Sale</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{
+                          flex: 1.1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          border: generatedBooking.status === 'Returned' ? '1px solid #f59e0b' : '1px solid #fca5a5',
+                          backgroundColor: generatedBooking.status === 'Returned' ? '#fef3c7' : '#fee2e2',
+                          color: generatedBooking.status === 'Returned' ? '#b45309' : '#dc2626'
+                        }}
+                        onClick={() => handleReturnBooking(generatedBooking)}
+                        title="Return / Refund Booking Advance Amount"
+                      >
+                        <RotateCcw size={15} />
+                        <span>{generatedBooking.status === 'Returned' ? 'Undo Return' : 'Return Amt'}</span>
                       </button>
                     </div>
                   </div>
@@ -1837,30 +2493,200 @@ export default function LeadsManagement({
                   </div>
                 </div>
                 <div className="form-grid">
-                  <div className="form-group">
-                    <label className="form-label">Customer Name *</label>
+                  {/* Customer Name with Live Search from Leads & Quotations */}
+                  <div className="form-group" style={{ position: 'relative' }}>
+                    <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Customer Name *</span>
+                      {invoiceNameMatches.length > 0 && showInvoiceNameSuggestions && (
+                        <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>
+                          ⚡ {invoiceNameMatches.length} match{invoiceNameMatches.length > 1 ? 'es' : ''} from Leads & Quotes
+                        </span>
+                      )}
+                    </label>
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="Rahul Kumar"
+                      
                       required
                       value={invoiceFormData.customerName}
-                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerName: e.target.value })}
+                      onChange={(e) => {
+                        setInvoiceFormData({ ...invoiceFormData, customerName: e.target.value });
+                        setShowInvoiceNameSuggestions(true);
+                      }}
+                      onFocus={() => setShowInvoiceNameSuggestions(true)}
+                      autoComplete="off"
                     />
+
+                    {/* Floating Suggestion Dropdown for Name */}
+                    {showInvoiceNameSuggestions && invoiceNameMatches.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        backgroundColor: '#ffffff',
+                        border: '1.5px solid #059669',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.18)',
+                        zIndex: 1050,
+                        marginTop: '4px',
+                        maxHeight: '260px',
+                        overflowY: 'auto'
+                      }}>
+                        <div style={{ padding: '6px 12px', backgroundColor: '#f0fdf4', borderBottom: '1px solid #d1fae5', fontSize: '0.72rem', fontWeight: 700, color: '#065f46', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>SELECT TO AUTO-FILL INVOICE</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowInvoiceNameSuggestions(false)}
+                            style={{ background: 'none', border: 'none', fontSize: '0.75rem', color: '#6b7280', cursor: 'pointer', padding: 0 }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        {invoiceNameMatches.map((m, idx) => (
+                          <div
+                            key={`inv-name-${m.type}-${m.id}-${idx}`}
+                            onClick={() => handlePickInvoiceCustomerSuggestion(m)}
+                            style={{
+                              padding: '9px 12px',
+                              borderBottom: idx < invoiceNameMatches.length - 1 ? '1px solid #f3f4f6' : 'none',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              transition: 'background-color 0.15s ease',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#ecfdf5'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                          >
+                            <div>
+                              <div style={{ fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>{m.name || m.customerName}</span>
+                                <span style={{
+                                  fontSize: '0.68rem',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  fontWeight: 600,
+                                  backgroundColor: m.type === 'quotation' ? '#eff6ff' : '#fef3c7',
+                                  color: m.type === 'quotation' ? '#1d4ed8' : '#b45309',
+                                  border: `1px solid ${m.type === 'quotation' ? '#bfdbfe' : '#fde68a'}`
+                                }}>
+                                  {m.type === 'quotation' ? `🧾 Quote #${m.id}` : `📋 Lead #${m.id}`}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#6b7280', marginTop: '2px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                <span>📞 {m.mobile || m.customerPhone || 'No phone'}</span>
+                                {(m.vehicle || m.vehicleModel) && <span>| 🏍️ {m.vehicle || m.vehicleModel} {m.color || m.vehicleColor ? `(${m.color || m.vehicleColor})` : ''}</span>}
+                                {(m.address || m.customerAddress) && <span>| 📍 {m.address || m.customerAddress}</span>}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '8px' }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', display: 'block' }}>
+                                ₹{Number(m.total || m.exShowroom || m.price || 0).toLocaleString('en-IN')}
+                              </span>
+                              <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 600 }}>+ Auto-fill</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Mobile Number *</label>
+
+                  {/* Mobile Number with Live Search */}
+                  <div className="form-group" style={{ position: 'relative' }}>
+                    <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Mobile Number *</span>
+                      {invoicePhoneMatches.length > 0 && showInvoicePhoneSuggestions && (
+                        <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>
+                          ⚡ {invoicePhoneMatches.length} match{invoicePhoneMatches.length > 1 ? 'es' : ''}
+                        </span>
+                      )}
+                    </label>
                     <input
                       type="tel"
                       inputMode="numeric"
                       maxLength={10}
                       className="form-control"
-                      placeholder="10-digit number"
+                      placeholder="10-digit number (Searchable)"
                       required
                       pattern="[0-9]{10}"
                       value={invoiceFormData.customerPhone}
-                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerPhone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                      onChange={(e) => {
+                        setInvoiceFormData({ ...invoiceFormData, customerPhone: e.target.value.replace(/\D/g, '').slice(0, 10) });
+                        setShowInvoicePhoneSuggestions(true);
+                      }}
+                      onFocus={() => setShowInvoicePhoneSuggestions(true)}
+                      autoComplete="off"
                     />
+
+                    {/* Floating Suggestion Dropdown for Phone */}
+                    {showInvoicePhoneSuggestions && invoicePhoneMatches.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        backgroundColor: '#ffffff',
+                        border: '1.5px solid #059669',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.18)',
+                        zIndex: 1050,
+                        marginTop: '4px',
+                        maxHeight: '260px',
+                        overflowY: 'auto'
+                      }}>
+                        <div style={{ padding: '6px 12px', backgroundColor: '#f0fdf4', borderBottom: '1px solid #d1fae5', fontSize: '0.72rem', fontWeight: 700, color: '#065f46', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>MATCHING PHONE NUMBERS</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowInvoicePhoneSuggestions(false)}
+                            style={{ background: 'none', border: 'none', fontSize: '0.75rem', color: '#6b7280', cursor: 'pointer', padding: 0 }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        {invoicePhoneMatches.map((m, idx) => (
+                          <div
+                            key={`inv-phone-${m.type}-${m.id}-${idx}`}
+                            onClick={() => handlePickInvoiceCustomerSuggestion(m)}
+                            style={{
+                              padding: '9px 12px',
+                              borderBottom: idx < invoicePhoneMatches.length - 1 ? '1px solid #f3f4f6' : 'none',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              transition: 'background-color 0.15s ease',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#ecfdf5'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                          >
+                            <div>
+                              <div style={{ fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>{m.name || m.customerName}</span>
+                                <span style={{
+                                  fontSize: '0.68rem',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  fontWeight: 600,
+                                  backgroundColor: m.type === 'quotation' ? '#eff6ff' : '#fef3c7',
+                                  color: m.type === 'quotation' ? '#1d4ed8' : '#b45309',
+                                  border: `1px solid ${m.type === 'quotation' ? '#bfdbfe' : '#fde68a'}`
+                                }}>
+                                  {m.type === 'quotation' ? `🧾 Quote #${m.id}` : `📋 Lead #${m.id}`}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#6b7280', marginTop: '2px' }}>
+                                📞 <strong>{m.mobile || m.customerPhone}</strong> {(m.vehicle || m.vehicleModel) ? `| 🏍️ ${m.vehicle || m.vehicleModel}` : ''}
+                              </div>
+                            </div>
+                            <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 600 }}>+ Auto-fill</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="form-grid">
@@ -1869,9 +2695,9 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="12-digit Aadhar"
+                      
                       pattern="[0-9]{12}"
-                      value={invoiceFormData.customerAadhar}
+                      maxLength={12} pattern="[0-9]{12}" value={invoiceFormData.customerAadhar}
                       onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerAadhar: e.target.value })}
                     />
                   </div>
@@ -1880,9 +2706,9 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="15-digit GSTIN"
+                      
                       style={{ textTransform: 'uppercase' }}
-                      value={invoiceFormData.customerGst}
+                      maxLength={15} value={invoiceFormData.customerGst}
                       onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerGst: e.target.value.toUpperCase() })}
                     />
                   </div>
@@ -1892,7 +2718,7 @@ export default function LeadsManagement({
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="Enter complete billing address"
+                    
                     value={invoiceFormData.customerAddress}
                     onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerAddress: e.target.value })}
                   />
@@ -1944,7 +2770,7 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="Enter 17-digit Chassis VIN"
+                      
                       style={{ textTransform: 'uppercase' }}
                       value={invoiceFormData.vinNumber}
                       onChange={(e) => setInvoiceFormData({ ...invoiceFormData, vinNumber: e.target.value.toUpperCase() })}
@@ -1955,7 +2781,7 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="Battery serial number"
+                      
                       style={{ textTransform: 'uppercase' }}
                       value={invoiceFormData.batteryNumber}
                       onChange={(e) => setInvoiceFormData({ ...invoiceFormData, batteryNumber: e.target.value.toUpperCase() })}
@@ -1968,7 +2794,7 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="Charger serial number"
+                      
                       style={{ textTransform: 'uppercase' }}
                       value={invoiceFormData.chargerNumber}
                       onChange={(e) => setInvoiceFormData({ ...invoiceFormData, chargerNumber: e.target.value.toUpperCase() })}
@@ -1979,7 +2805,7 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="Controller serial number"
+                      
                       style={{ textTransform: 'uppercase' }}
                       value={invoiceFormData.controllerNumber}
                       onChange={(e) => setInvoiceFormData({ ...invoiceFormData, controllerNumber: e.target.value.toUpperCase() })}
@@ -1991,7 +2817,7 @@ export default function LeadsManagement({
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="3 Year Warranty on Battery & Motor"
+                    
                     value={invoiceFormData.warrantyDetails}
                     onChange={(e) => setInvoiceFormData({ ...invoiceFormData, warrantyDetails: e.target.value })}
                   />
@@ -2025,7 +2851,7 @@ export default function LeadsManagement({
                     <select
                       className="form-control"
                       required
-                      value={invoiceFormData.gstRate}
+                      maxLength={15} value={invoiceFormData.gstRate}
                       onChange={(e) => setInvoiceFormData({ ...invoiceFormData, gstRate: Number(e.target.value) })}
                     >
                       <option value={28}>28% GST (Standard)</option>
@@ -2144,7 +2970,7 @@ export default function LeadsManagement({
       )}
 
       {/* SUBTAB 4: INVOICE */}
-      {activeSubTab === 'invoice' && (
+      {currentSubTab === 'invoice' && (
         <div style={{
           display: 'grid',
           gridTemplateColumns: showPreviews ? '1.2fr 1fr' : '1fr',
@@ -2156,15 +2982,6 @@ export default function LeadsManagement({
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <h3 className="card-title">Saved Tax Invoices</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#eff6ff', color: '#1e40af', borderColor: '#bfdbfe', fontWeight: 600 }}
-                  onClick={() => setIsMonthlyReportOpen(true)}
-                  title="View Monthly Sales & GST Tax Reports"
-                >
-                  <BarChart3 size={14} /> Monthly Report
-                </button>
                 <button
                   type="button"
                   className="btn btn-primary btn-sm"
@@ -2481,6 +3298,20 @@ export default function LeadsManagement({
                       </div>
                     </div>
 
+                    {/* Dealership Invoice Terms & Conditions */}
+                    <div style={{ marginTop: '16px', fontSize: '0.7rem', color: '#4b5563', lineHeight: 1.4 }}>
+                      <strong style={{ display: 'block', color: '#111827', marginBottom: '4px', textTransform: 'uppercase', fontSize: '0.72rem' }}>
+                        Terms & Conditions
+                      </strong>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>
+                        {companyProfile?.invoiceTerms || `1. Goods once sold will not be taken back or exchanged.
+2. Warranty is subject to manufacturer's policy and applies from the date of this invoice.
+3. Dealership is not liable for indirect damages or delays beyond our control.
+4. All disputes are subject to local city jurisdiction only.
+5. E. & O.E. (Errors and Omissions Excepted)`}
+                      </div>
+                    </div>
+
                     <div style={{ marginTop: '20px', borderTop: '1px dashed #ccc', paddingTop: '10px', fontSize: '0.7rem', color: '#9ca3af', textAlign: 'center' }}>
                       Certified that the particulars given above are true and correct.<br />
                       This is a computer generated invoice printout.
@@ -2575,55 +3406,15 @@ export default function LeadsManagement({
                   1. Customer Details
                 </h4>
                 
-                <div className="form-group">
-                  <label className="form-label">Full Name *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Enter customer name"
-                    required
-                    value={leadFormData.name}
-                    onChange={(e) => setLeadFormData({ ...leadFormData, name: e.target.value })}
-                  />
-                </div>
-
                 <div className="form-grid">
                   <div className="form-group">
-                    <label className="form-label">Mobile Number *</label>
+                    <label className="form-label">Lead Entry Date *</label>
                     <input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
+                      type="date"
                       className="form-control"
-                      placeholder="10-digit number"
                       required
-                      pattern="[0-9]{10}"
-                      value={leadFormData.mobile}
-                      onChange={(e) => setLeadFormData({ ...leadFormData, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Email Address</label>
-                    <input
-                      type="email"
-                      className="form-control"
-                      placeholder="name@example.com"
-                      value={leadFormData.email}
-                      onChange={(e) => setLeadFormData({ ...leadFormData, email: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label className="form-label">Aadhar Card Number</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="12-digit number"
-                      maxLength="14"
-                      value={leadFormData.aadhar}
-                      onChange={(e) => setLeadFormData({ ...leadFormData, aadhar: e.target.value })}
+                      value={leadFormData.entryDate}
+                      onChange={(e) => setLeadFormData({ ...leadFormData, entryDate: e.target.value })}
                     />
                   </div>
                   <div className="form-group">
@@ -2641,30 +3432,82 @@ export default function LeadsManagement({
                   </div>
                 </div>
 
+                <div className="form-group">
+                  <label className="form-label">Full Name *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    
+                    required
+                    value={leadFormData.name}
+                    onChange={(e) => setLeadFormData({ ...leadFormData, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Mobile Number *</label>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      className="form-control"
+                      
+                      required
+                      pattern="[0-9]{10}"
+                      value={leadFormData.mobile}
+                      onChange={(e) => setLeadFormData({ ...leadFormData, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Email Address</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      
+                      value={leadFormData.email}
+                      onChange={(e) => setLeadFormData({ ...leadFormData, email: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Aadhar Card Number</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      
+                      maxLength="14"
+                      maxLength={12} pattern="[0-9]{12}" value={leadFormData.aadhar}
+                      onChange={(e) => setLeadFormData({ ...leadFormData, aadhar: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Assigned Executive *</label>
+                    <select
+                      className="form-control"
+                      value={leadFormData.executive}
+                      onChange={(e) => setLeadFormData({ ...leadFormData, executive: e.target.value })}
+                    >
+                      {executiveList.map((exec, idx) => (
+                        <option key={idx} value={exec}>{exec}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 <div className="form-grid">
                   <div className="form-group" style={{ gridColumn: 'span 2' }}>
                     <label className="form-label">Address</label>
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="House No, Street, Landmark, Area"
+                      
                       value={leadFormData.address}
                       onChange={(e) => setLeadFormData({ ...leadFormData, address: e.target.value })}
                     />
                   </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Assigned Executive *</label>
-                  <select
-                    className="form-control"
-                    value={leadFormData.executive}
-                    onChange={(e) => setLeadFormData({ ...leadFormData, executive: e.target.value })}
-                  >
-                    {executiveList.map((exec, idx) => (
-                      <option key={idx} value={exec}>{exec}</option>
-                    ))}
-                  </select>
                 </div>
               </div>
 
@@ -2710,7 +3553,7 @@ export default function LeadsManagement({
                     inputMode="numeric"
                     className="form-control"
                     required
-                    placeholder="Enter ex-showroom price"
+                    
                     value={leadFormData.price}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -2722,10 +3565,10 @@ export default function LeadsManagement({
                 </div>
               </div>
 
-              {/* SECTION C: LEAD FOLLOWUP */}
+              {/* SECTION C: LEAD FOLLOWUP & REMINDER */}
               <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ fontSize: '0.85rem', color: '#059669', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px', fontWeight: 700 }}>
-                  3. Lead Followup
+                <h4 style={{ fontSize: '0.85rem', color: '#059669', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Bell size={15} /> 3. Lead Followup & Reminder
                 </h4>
 
                 <div className="form-grid">
@@ -2754,6 +3597,62 @@ export default function LeadsManagement({
                   </div>
                 </div>
 
+                {/* REMINDER ON / OFF TOGGLE SWITCH */}
+                <div className="form-group" style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', padding: '12px 14px', borderRadius: '8px', marginBottom: '14px' }}>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontWeight: 600 }}>Follow-up Reminder Option</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: leadFormData.reminder === 'ON' ? '#059669' : '#dc2626' }}>
+                      {leadFormData.reminder === 'ON' ? '🔔 Reminder is ON' : '🔕 Reminder is OFF'}
+                    </span>
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setLeadFormData({ ...leadFormData, reminder: 'ON' })}
+                      style={{
+                        padding: '9px 14px',
+                        borderRadius: '6px',
+                        border: '1.5px solid',
+                        borderColor: leadFormData.reminder === 'ON' ? '#059669' : '#d1d5db',
+                        backgroundColor: leadFormData.reminder === 'ON' ? '#ecfdf5' : '#ffffff',
+                        color: leadFormData.reminder === 'ON' ? '#047857' : '#6b7280',
+                        fontWeight: leadFormData.reminder === 'ON' ? 700 : 500,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Bell size={15} /> Reminder ON
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLeadFormData({ ...leadFormData, reminder: 'OFF' })}
+                      style={{
+                        padding: '9px 14px',
+                        borderRadius: '6px',
+                        border: '1.5px solid',
+                        borderColor: leadFormData.reminder === 'OFF' ? '#ef4444' : '#d1d5db',
+                        backgroundColor: leadFormData.reminder === 'OFF' ? '#fef2f2' : '#ffffff',
+                        color: leadFormData.reminder === 'OFF' ? '#b91c1c' : '#6b7280',
+                        fontWeight: leadFormData.reminder === 'OFF' ? 700 : 500,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <BellOff size={15} /> Reminder OFF
+                    </button>
+                  </div>
+                </div>
+
                 <div className="form-grid">
                   <div className="form-group">
                     <label className="form-label">Follow-up Date</label>
@@ -2765,15 +3664,25 @@ export default function LeadsManagement({
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Note / Action Description</label>
+                    <label className="form-label">Reminder Time</label>
                     <input
-                      type="text"
+                      type="time"
                       className="form-control"
-                      placeholder=""
-                      value={leadFormData.note}
-                      onChange={(e) => setLeadFormData({ ...leadFormData, note: e.target.value })}
+                      value={leadFormData.reminderTime || '10:00'}
+                      onChange={(e) => setLeadFormData({ ...leadFormData, reminderTime: e.target.value })}
                     />
                   </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Note / Action Description</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    
+                    value={leadFormData.note}
+                    onChange={(e) => setLeadFormData({ ...leadFormData, note: e.target.value })}
+                  />
                 </div>
               </div>
 
@@ -2798,19 +3707,21 @@ export default function LeadsManagement({
           justifyContent: 'center',
           alignItems: 'center',
           zIndex: 1100,
-          backdropFilter: 'blur(3px)'
+          backdropFilter: 'blur(4px)'
         }} onClick={() => setActiveFormTab(null)}>
           <div className="card" style={{
-            width: '90%',
-            maxWidth: '650px',
-            maxHeight: '90vh',
+            width: '92%',
+            maxWidth: '660px',
+            maxHeight: '92vh',
             overflowY: 'auto',
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)',
-            margin: 0
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
+            margin: 0,
+            borderRadius: '12px'
           }} onClick={(e) => e.stopPropagation()}>
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 className="card-title">
-                <Calculator size={18} style={{ color: '#059669' }} /> {editingQuoteId ? `Edit Quotation #${editingQuoteId}` : 'On-Road Quotation Builder'}
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e5e7eb' }}>
+              <h3 className="card-title" style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calculator size={20} style={{ color: '#059669' }} />
+                {editingQuoteId ? `Edit On-Road Quotation #${editingQuoteId}` : 'On-Road Quotation Calculator'}
               </h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {editingQuoteId && (
@@ -2820,183 +3731,461 @@ export default function LeadsManagement({
                     onClick={() => setEditingQuoteId(null)}
                     style={{ padding: '4px 10px', fontSize: '0.75rem', color: '#b91c1c' }}
                   >
-                    Reset Form
+                    Reset
                   </button>
                 )}
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
                   onClick={() => { setActiveFormTab(null); setEditingQuoteId(null); }}
-                  style={{ padding: '4px 10px', minWidth: 'auto' }}
+                  style={{ padding: '4px 10px', minWidth: 'auto', borderRadius: '6px' }}
                 >
                   ✕ Close
                 </button>
               </div>
             </div>
-            <form className="card-body" onSubmit={(e) => { handleQuoteSubmit(e); setActiveFormTab(null); }}>
-              <div className="form-grid">
+
+            <form className="card-body" style={{ padding: '20px' }} onSubmit={(e) => { handleQuoteSubmit(e); setActiveFormTab(null); }}>
+              {/* SECTION 1: CUSTOMER DETAILS */}
+              <div style={{ marginBottom: '20px', borderBottom: '1px solid #f3f4f6', paddingBottom: '16px' }}>
+                <h4 style={{ fontSize: '0.82rem', color: '#059669', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 700 }}>
+                  1. Customer Information
+                </h4>
+                <div className="form-grid">
+                  {/* Customer Name Input with Live Matching Leads Dropdown */}
+                  <div className="form-group" style={{ position: 'relative' }}>
+                    <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Customer Name *</span>
+                      {nameLeadMatches.length > 0 && showLeadNameSuggestions && (
+                        <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 600 }}>
+                          ⚡ {nameLeadMatches.length} lead {nameLeadMatches.length === 1 ? 'match' : 'matches'} found
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      
+                      required
+                      autoComplete="off"
+                      value={quoteFormData.customerName}
+                      onFocus={() => setShowLeadNameSuggestions(true)}
+                      onChange={(e) => {
+                        setQuoteFormData({ ...quoteFormData, customerName: e.target.value });
+                        setShowLeadNameSuggestions(true);
+                      }}
+                    />
+
+                    {/* Dropdown Box below input when matching leads exist */}
+                    {showLeadNameSuggestions && nameLeadMatches.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1200,
+                        backgroundColor: '#ffffff',
+                        border: '1.5px solid #10b981',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.18), 0 4px 6px -2px rgba(0,0,0,0.05)',
+                        marginTop: '4px',
+                        maxHeight: '250px',
+                        overflowY: 'auto'
+                      }}>
+                        <div style={{
+                          padding: '7px 12px',
+                          backgroundColor: '#ecfdf5',
+                          borderBottom: '1px solid #d1fae5',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <span style={{ fontSize: '0.73rem', fontWeight: 700, color: '#047857', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            ⚡ Leads Found — Click to Auto-Fill
+                          </span>
+                          <span
+                            onClick={(e) => { e.stopPropagation(); setShowLeadNameSuggestions(false); }}
+                            style={{ fontSize: '0.72rem', color: '#6b7280', cursor: 'pointer', fontWeight: 600 }}
+                          >
+                            ✕ Close
+                          </span>
+                        </div>
+
+                        {nameLeadMatches.map((matchedLead, idx) => (
+                          <div
+                            key={matchedLead.id || idx}
+                            onMouseDown={() => handlePickLeadSuggestion(matchedLead)}
+                            style={{
+                              padding: '10px 14px',
+                              borderBottom: idx < nameLeadMatches.length - 1 ? '1px solid #f3f4f6' : 'none',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              transition: 'all 0.12s ease',
+                              backgroundColor: '#ffffff'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0fdf4'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                          >
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#111827', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>{matchedLead.name}</span>
+                                <span style={{ fontSize: '0.68rem', color: '#059669', backgroundColor: '#ecfdf5', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bbf7d0', fontWeight: 600 }}>
+                                  Lead #{matchedLead.id}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.76rem', color: '#6b7280', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>📞 {matchedLead.mobile}</span>
+                                <span>•</span>
+                                <span style={{ color: '#059669', fontWeight: 600 }}>🏍️ {matchedLead.vehicle || matchedLead.vehicleModel || 'Two-Wheeler'} {matchedLead.color ? `(${matchedLead.color})` : ''}</span>
+                              </div>
+                            </div>
+
+                            <div style={{ textAlign: 'right' }}>
+                              <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#059669' }}>
+                                ₹{Number(matchedLead.price || 0).toLocaleString('en-IN')}
+                              </span>
+                              <span style={{ display: 'block', fontSize: '0.68rem', color: '#10b981', fontWeight: 600 }}>
+                                Click to Add ↵
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mobile Number Input with Live Matching Leads Dropdown */}
+                  <div className="form-group" style={{ position: 'relative' }}>
+                    <label className="form-label">Mobile Number</label>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      className="form-control"
+                      
+                      pattern="[0-9]{10}"
+                      autoComplete="off"
+                      value={quoteFormData.customerPhone}
+                      onFocus={() => setShowLeadPhoneSuggestions(true)}
+                      onChange={(e) => {
+                        setQuoteFormData({ ...quoteFormData, customerPhone: e.target.value.replace(/\D/g, '').slice(0, 10) });
+                        setShowLeadPhoneSuggestions(true);
+                      }}
+                    />
+
+                    {showLeadPhoneSuggestions && phoneLeadMatches.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1200,
+                        backgroundColor: '#ffffff',
+                        border: '1.5px solid #10b981',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.18)',
+                        marginTop: '4px',
+                        maxHeight: '250px',
+                        overflowY: 'auto'
+                      }}>
+                        <div style={{
+                          padding: '7px 12px',
+                          backgroundColor: '#ecfdf5',
+                          borderBottom: '1px solid #d1fae5',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <span style={{ fontSize: '0.73rem', fontWeight: 700, color: '#047857' }}>
+                            ⚡ Matching Lead by Phone (Click to Auto-Fill)
+                          </span>
+                          <span
+                            onClick={(e) => { e.stopPropagation(); setShowLeadPhoneSuggestions(false); }}
+                            style={{ fontSize: '0.72rem', color: '#6b7280', cursor: 'pointer', fontWeight: 600 }}
+                          >
+                            ✕
+                          </span>
+                        </div>
+
+                        {phoneLeadMatches.map((matchedLead, idx) => (
+                          <div
+                            key={matchedLead.id || idx}
+                            onMouseDown={() => handlePickLeadSuggestion(matchedLead)}
+                            style={{
+                              padding: '10px 14px',
+                              borderBottom: idx < phoneLeadMatches.length - 1 ? '1px solid #f3f4f6' : 'none',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              transition: 'all 0.12s ease'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0fdf4'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                          >
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#111827' }}>
+                                {matchedLead.name} (📞 {matchedLead.mobile})
+                              </div>
+                              <div style={{ fontSize: '0.76rem', color: '#059669', marginTop: '2px' }}>
+                                🏍️ {matchedLead.vehicle || matchedLead.vehicleModel} ({matchedLead.color || 'Standard'})
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#059669' }}>
+                                ₹{Number(matchedLead.price || 0).toLocaleString('en-IN')}
+                              </span>
+                              <span style={{ display: 'block', fontSize: '0.68rem', color: '#10b981', fontWeight: 600 }}>
+                                Click to Add ↵
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="form-grid">
+                  {/* Customer Email */}
+                  <div className="form-group">
+                    <label className="form-label">Email Address</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      
+                      value={quoteFormData.customerEmail}
+                      onChange={(e) => setQuoteFormData({ ...quoteFormData, customerEmail: e.target.value })}
+                    />
+                  </div>
+                  {/* Assigned Sales Executive */}
+                  <div className="form-group">
+                    <label className="form-label">Assigned Executive</label>
+                    <select
+                      className="form-control"
+                      value={quoteFormData.executive}
+                      onChange={(e) => setQuoteFormData({ ...quoteFormData, executive: e.target.value })}
+                    >
+                      {executiveList.map((exec, idx) => (
+                        <option key={idx} value={exec}>{exec}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-grid">
+                  {/* Aadhar Number */}
+                  <div className="form-group">
+                    <label className="form-label">Aadhar Number</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      
+                      maxLength="14"
+                      maxLength={12} pattern="[0-9]{12}" value={quoteFormData.customerAadhar}
+                      onChange={(e) => setQuoteFormData({ ...quoteFormData, customerAadhar: e.target.value })}
+                    />
+                  </div>
+                  {/* Customer GSTIN */}
+                  <div className="form-group">
+                    <label className="form-label">Customer GSTIN (Optional)</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      
+                      style={{ textTransform: 'uppercase' }}
+                      maxLength={15} value={quoteFormData.customerGst}
+                      onChange={(e) => setQuoteFormData({ ...quoteFormData, customerGst: e.target.value.toUpperCase() })}
+                    />
+                  </div>
+                </div>
+
+                {/* Customer Address Input */}
                 <div className="form-group">
-                  <label className="form-label">Customer Name</label>
+                  <label className="form-label">Customer Address</label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="Enter customer name"
-                    value={quoteFormData.customerName}
-                    onChange={(e) => setQuoteFormData({ ...quoteFormData, customerName: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Mobile Number</label>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={10}
-                    className="form-control"
-                    placeholder="10-digit mobile"
-                    pattern="[0-9]{10}"
-                    value={quoteFormData.customerPhone}
-                    onChange={(e) => setQuoteFormData({ ...quoteFormData, customerPhone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                    
+                    value={quoteFormData.customerAddress}
+                    onChange={(e) => setQuoteFormData({ ...quoteFormData, customerAddress: e.target.value })}
                   />
                 </div>
               </div>
 
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">Vehicle Model *</label>
-                  <select
-                    className="form-control"
-                    required
-                    value={quoteFormData.vehicleModel}
-                    onChange={(e) => {
-                      const selectedModel = e.target.value;
-                      const matchedVeh = vehicleList.find(v => v.name === selectedModel);
-                      setQuoteFormData({ 
-                        ...quoteFormData, 
-                        vehicleModel: selectedModel,
-                        exShowroom: matchedVeh ? matchedVeh.basePrice : ''
-                      });
-                    }}
-                  >
-                    <option value="">Choose Option</option>
-                    {vehicleList.map((veh, idx) => (
-                      <option key={idx} value={veh.name}>{veh.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Choose Color *</label>
-                  <select
-                    className="form-control"
-                    required
-                    value={quoteFormData.vehicleColor}
-                    onChange={(e) => setQuoteFormData({ ...quoteFormData, vehicleColor: e.target.value })}
-                  >
-                    <option value="">Choose Color</option>
-                    {allVehicleColors.map((color, idx) => (
-                      <option key={idx} value={color}>{color}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">Ex-Showroom Base Price (₹) *</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    className="form-control"
-                    placeholder="Enter ex-showroom price"
-                    required
-                    value={quoteFormData.exShowroom}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === '' || /^\d*$/.test(val)) {
-                        setQuoteFormData({ ...quoteFormData, exShowroom: val });
-                      }
-                    }}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Special Dealer Discount (₹)</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    className="form-control"
-                    placeholder="Enter dealer discount"
-                    style={{ color: '#ef4444', fontWeight: 600 }}
-                    value={quoteFormData.discount}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === '' || /^\d*$/.test(val)) {
-                        setQuoteFormData({ ...quoteFormData, discount: val });
-                      }
-                    }}
-                  />
+              {/* SECTION 2: VEHICLE CHOICE */}
+              <div style={{ marginBottom: '20px', borderBottom: '1px solid #f3f4f6', paddingBottom: '16px' }}>
+                <h4 style={{ fontSize: '0.82rem', color: '#059669', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 700 }}>
+                  2. Vehicle Selection
+                </h4>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Vehicle Model *</label>
+                    <select
+                      className="form-control"
+                      required
+                      value={quoteFormData.vehicleModel}
+                      onChange={(e) => {
+                        const selectedModel = e.target.value;
+                        const matchedVeh = vehicleList.find(v => v.name === selectedModel);
+                        setQuoteFormData({ 
+                          ...quoteFormData, 
+                          vehicleModel: selectedModel,
+                          exShowroom: matchedVeh ? matchedVeh.basePrice : ''
+                        });
+                      }}
+                    >
+                      <option value="">Choose Vehicle Model</option>
+                      {vehicleList.map((veh, idx) => (
+                        <option key={idx} value={veh.name}>{veh.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Choose Color *</label>
+                    <select
+                      className="form-control"
+                      required
+                      value={quoteFormData.vehicleColor}
+                      onChange={(e) => setQuoteFormData({ ...quoteFormData, vehicleColor: e.target.value })}
+                    >
+                      <option value="">Choose Color</option>
+                      {allVehicleColors.map((color, idx) => (
+                        <option key={idx} value={color}>{color}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">RTO Registration Charges (₹) *</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    className="form-control"
-                    placeholder="Enter RTO road tax"
-                    required
-                    value={quoteFormData.rto}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === '' || /^\d*$/.test(val)) {
-                        setQuoteFormData({ ...quoteFormData, rto: val });
-                      }
-                    }}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Comprehensive Insurance (₹) *</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    className="form-control"
-                    placeholder="Enter insurance premium"
-                    required
-                    value={quoteFormData.insurance}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === '' || /^\d*$/.test(val)) {
-                        setQuoteFormData({ ...quoteFormData, insurance: val });
-                      }
-                    }}
-                  />
-                </div>
-              </div>
+              {/* SECTION 3: ON-ROAD PRICE BREAKDOWN */}
+              <div style={{ marginBottom: '20px' }}>
+                <h4 style={{ fontSize: '0.82rem', color: '#059669', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: 700 }}>
+                  3. Price Components (₹)
+                </h4>
 
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">Standard Accessories / Helmet (₹)</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    className="form-control"
-                    placeholder="Enter accessories cost"
-                    value={quoteFormData.accessories}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === '' || /^\d*$/.test(val)) {
-                        setQuoteFormData({ ...quoteFormData, accessories: val });
-                      }
-                    }}
-                  />
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Ex-Showroom Base Price (₹) *</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="form-control"
+                      
+                      required
+                      value={quoteFormData.exShowroom}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d*$/.test(val)) {
+                          setQuoteFormData({ ...quoteFormData, exShowroom: val });
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Select GST Tax Rate *</label>
+                    <select
+                      className="form-control"
+                      required
+                      maxLength={15} value={quoteFormData.gstRate}
+                      onChange={(e) => setQuoteFormData({ ...quoteFormData, gstRate: Number(e.target.value) })}
+                    >
+                      <option value={28}>28% GST (Standard Two-Wheelers)</option>
+                      <option value={18}>18% GST (Commercial / Spares)</option>
+                      <option value={12}>12% GST</option>
+                      <option value={5}>5% GST (EV Standard)</option>
+                      <option value={0}>0% GST (Exempted / Zero Tax)</option>
+                    </select>
+                    {quoteFormData.exShowroom && (
+                      <span style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 600, display: 'block', marginTop: '3px' }}>
+                        GST Amount: ₹{Math.round(Number(quoteFormData.exShowroom || 0) * (Number(quoteFormData.gstRate || 0) / 100)).toLocaleString('en-IN')} ({quoteFormData.gstRate}%)
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Special Dealer Discount (₹)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="form-control"
+                      
+                      style={{ color: '#ef4444', fontWeight: 600 }}
+                      value={quoteFormData.discount}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d*$/.test(val)) {
+                          setQuoteFormData({ ...quoteFormData, discount: val });
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">RTO Registration & Tax (₹) *</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="form-control"
+                      
+                      required
+                      value={quoteFormData.rto}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d*$/.test(val)) {
+                          setQuoteFormData({ ...quoteFormData, rto: val });
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">5-Yr Comprehensive Insurance (₹) *</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="form-control"
+                      
+                      required
+                      value={quoteFormData.insurance}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d*$/.test(val)) {
+                          setQuoteFormData({ ...quoteFormData, insurance: val });
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Accessories & Helmet Kit (₹)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="form-control"
+                      
+                      value={quoteFormData.accessories}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d*$/.test(val)) {
+                          setQuoteFormData({ ...quoteFormData, accessories: val });
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
                 <div className="form-group">
-                  <label className="form-label">Logistics / Handling (₹)</label>
+                  <label className="form-label">Logistics / Handling Charges (₹)</label>
                   <input
                     type="text"
                     inputMode="numeric"
                     className="form-control"
-                    placeholder="Enter handling fees"
+                    
                     value={quoteFormData.handling}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -3008,24 +4197,36 @@ export default function LeadsManagement({
                 </div>
               </div>
 
+              {/* Real-time Estimated On-Road Price Banner */}
               <div style={{
-                marginTop: '16px',
-                padding: '16px',
-                backgroundColor: '#f9fafb',
-                borderRadius: '8px',
-                border: '1px solid #e5e7eb',
+                padding: '16px 20px',
+                backgroundColor: '#ecfdf5',
+                borderRadius: '10px',
+                border: '1.5px solid #a7f3d0',
                 display: 'flex',
                 justifyContent: 'space-between',
-                alignItems: 'center'
+                alignItems: 'center',
+                marginBottom: '18px'
               }}>
-                <span style={{ fontWeight: 600, color: '#374151', fontSize: '0.95rem' }}>Estimated On-Road Price:</span>
-                <span style={{ fontSize: '1.4rem', fontWeight: 700, color: '#059669' }}>
+                <div>
+                  <span style={{ fontWeight: 700, color: '#047857', fontSize: '0.85rem', textTransform: 'uppercase', display: 'block' }}>
+                    Calculated Net On-Road Total
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#065f46' }}>
+                    Auto-sum of vehicle base price, statutory levies, and deductions
+                  </span>
+                </div>
+                <span style={{ fontSize: '1.6rem', fontWeight: 800, color: '#059669' }}>
                   ₹{calculateOnRoadTotal().toLocaleString('en-IN')}
                 </span>
               </div>
 
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '16px', padding: '10px', fontWeight: 600 }}>
-                Generate On-Road Quotation Printout
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '12px', fontSize: '0.95rem', fontWeight: 700, borderRadius: '8px' }}
+              >
+                {editingQuoteId ? 'UPDATE ON-ROAD QUOTATION' : 'GENERATE & SAVE QUOTATION'}
               </button>
             </form>
           </div>
@@ -3079,7 +4280,7 @@ export default function LeadsManagement({
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="Enter customer name"
+                    
                     required
                     value={bookingForm.customerName}
                     onChange={(e) => setBookingForm({ ...bookingForm, customerName: e.target.value })}
@@ -3092,7 +4293,7 @@ export default function LeadsManagement({
                     inputMode="numeric"
                     maxLength={10}
                     className="form-control"
-                    placeholder="10-digit number"
+                    
                     required
                     pattern="[0-9]{10}"
                     value={bookingForm.mobile}
@@ -3171,7 +4372,7 @@ export default function LeadsManagement({
                     type="text"
                     inputMode="numeric"
                     className="form-control"
-                    placeholder="Enter booking advance amount"
+                    
                     required
                     value={bookingForm.bookingAmount}
                     onChange={(e) => {
@@ -3202,7 +4403,7 @@ export default function LeadsManagement({
                 <input
                   type="text"
                   className="form-control"
-                  placeholder=""
+                  
                   value={bookingForm.notes}
                   onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })}
                 />
@@ -3221,537 +4422,21 @@ export default function LeadsManagement({
         </div>
       )}
 
-      {/* MONTHLY WISE INVOICE REPORT MODAL */}
-      {isMonthlyReportOpen && (
-        <div className="modal-backdrop" style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(17, 24, 39, 0.75)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1200,
-          padding: '20px'
-        }} onClick={() => setIsMonthlyReportOpen(false)}>
-          <div className="card" style={{
-            width: '100%',
-            maxWidth: '1050px',
-            maxHeight: '90vh',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            margin: 0,
-            backgroundColor: '#ffffff'
-          }} onClick={(e) => e.stopPropagation()}>
-            
-            {/* Report Header */}
-            <div className="card-header" style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              backgroundColor: '#1f2937',
-              color: '#ffffff',
-              padding: '14px 20px',
-              flexShrink: 0
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <BarChart3 size={24} style={{ color: '#10b981' }} />
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#ffffff' }}>
-                    Monthly Invoice Sales & GST Tax Report
-                  </h3>
-                  <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: '2px' }}>
-                    Multi-field filters &bull; Name, Sale Amount, GST Amount & Column selector
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: showColumnSelector ? '#059669' : '#374151', color: '#ffffff', border: '1px solid #4b5563', fontSize: '0.78rem' }}
-                  onClick={() => setShowColumnSelector(!showColumnSelector)}
-                  title="Select which fields to display in report"
-                >
-                  ⚙️ Select Fields ({Object.values(visibleColumns).filter(Boolean).length})
-                </button>
-
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#059669', color: '#ffffff', border: 'none', fontWeight: 600, fontSize: '0.78rem' }}
-                  onClick={handleExportMonthlyCSV}
-                >
-                  <Download size={13} /> Export CSV
-                </button>
-
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setIsMonthlyReportOpen(false)}
-                  style={{ backgroundColor: '#4b5563', color: '#ffffff', border: 'none', padding: '6px 12px', fontSize: '0.8rem' }}
-                >
-                  ✕ Close
-                </button>
-              </div>
-            </div>
-
-            {/* Report Body */}
-            <div className="card-body" style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-              
-              {/* INTERACTIVE MULTI-FIELD FILTER BAR */}
-              <div style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '14px', marginBottom: '18px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.82rem', color: '#111827' }}>
-                    <Filter size={15} style={{ color: '#059669' }} /> Filter Invoices by Fields
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setReportFilters({
-                      month: 'ALL',
-                      customerName: '',
-                      vehicleModel: 'ALL',
-                      paymentStatus: 'ALL',
-                      minSaleAmount: '',
-                      maxSaleAmount: '',
-                      minGstAmount: '',
-                      maxGstAmount: ''
-                    })}
-                    style={{ background: 'none', border: 'none', color: '#b91c1c', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-                  >
-                    Reset All Filters
-                  </button>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '10px' }}>
-                  {/* Month Filter */}
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#4b5563', marginBottom: '3px' }}>
-                      Month / Period
-                    </label>
-                    <select
-                      className="form-control"
-                      style={{ fontSize: '0.78rem', padding: '5px 8px', height: '32px' }}
-                      value={reportFilters.month}
-                      onChange={(e) => setReportFilters({ ...reportFilters, month: e.target.value })}
-                    >
-                      <option value="ALL">All Recorded Months</option>
-                      {monthlyInvoiceReportData.monthList.map((m, idx) => (
-                        <option key={idx} value={m}>
-                          {m} ({monthlyInvoiceReportData.monthGroups[m]?.count || 0} Invoices)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Customer Name Filter */}
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#4b5563', marginBottom: '3px' }}>
-                      Customer Name / Mobile
-                    </label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      style={{ fontSize: '0.78rem', padding: '5px 8px', height: '32px' }}
-                      placeholder="Search customer..."
-                      value={reportFilters.customerName}
-                      onChange={(e) => setReportFilters({ ...reportFilters, customerName: e.target.value })}
-                    />
-                  </div>
-
-                  {/* Vehicle Model Filter */}
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#4b5563', marginBottom: '3px' }}>
-                      Vehicle Model
-                    </label>
-                    <select
-                      className="form-control"
-                      style={{ fontSize: '0.78rem', padding: '5px 8px', height: '32px' }}
-                      value={reportFilters.vehicleModel}
-                      onChange={(e) => setReportFilters({ ...reportFilters, vehicleModel: e.target.value })}
-                    >
-                      <option value="ALL">All Vehicle Models</option>
-                      {vehicleList.map((v, idx) => (
-                        <option key={idx} value={v.name}>{v.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Payment Status Filter */}
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#4b5563', marginBottom: '3px' }}>
-                      Payment Status
-                    </label>
-                    <select
-                      className="form-control"
-                      style={{ fontSize: '0.78rem', padding: '5px 8px', height: '32px' }}
-                      value={reportFilters.paymentStatus}
-                      onChange={(e) => setReportFilters({ ...reportFilters, paymentStatus: e.target.value })}
-                    >
-                      <option value="ALL">All Payment Statuses</option>
-                      <option value="Fully Paid">Fully Paid</option>
-                      <option value="Partially Paid">Partially Paid</option>
-                      <option value="Unpaid">Unpaid</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Second Filter Row: Sale Amount Range & GST Amount Range */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#4b5563', marginBottom: '3px' }}>
-                      Min Sale Amount (₹)
-                    </label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      style={{ fontSize: '0.78rem', padding: '5px 8px', height: '32px' }}
-                      placeholder="e.g. 50000"
-                      value={reportFilters.minSaleAmount}
-                      onChange={(e) => setReportFilters({ ...reportFilters, minSaleAmount: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#4b5563', marginBottom: '3px' }}>
-                      Max Sale Amount (₹)
-                    </label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      style={{ fontSize: '0.78rem', padding: '5px 8px', height: '32px' }}
-                      placeholder="e.g. 150000"
-                      value={reportFilters.maxSaleAmount}
-                      onChange={(e) => setReportFilters({ ...reportFilters, maxSaleAmount: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#4b5563', marginBottom: '3px' }}>
-                      Min GST Amount (₹)
-                    </label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      style={{ fontSize: '0.78rem', padding: '5px 8px', height: '32px' }}
-                      placeholder="e.g. 2000"
-                      value={reportFilters.minGstAmount}
-                      onChange={(e) => setReportFilters({ ...reportFilters, minGstAmount: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#4b5563', marginBottom: '3px' }}>
-                      Max GST Amount (₹)
-                    </label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      style={{ fontSize: '0.78rem', padding: '5px 8px', height: '32px' }}
-                      placeholder="e.g. 10000"
-                      value={reportFilters.maxGstAmount}
-                      onChange={(e) => setReportFilters({ ...reportFilters, maxGstAmount: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* SELECT REPORT FIELDS TO DISPLAY / EXPORT ACCORDION */}
-              {showColumnSelector && (
-                <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '14px', marginBottom: '18px', animation: 'fadeIn 0.2s ease' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e40af' }}>
-                      📋 Select All Fields to Display in Report & Export:
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const allTrue = {};
-                          Object.keys(visibleColumns).forEach(k => allTrue[k] = true);
-                          setVisibleColumns(allTrue);
-                        }}
-                        style={{ backgroundColor: '#ffffff', border: '1px solid #93c5fd', color: '#1e40af', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
-                      >
-                        Select All Fields
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setVisibleColumns({
-                          invoiceNo: true,
-                          invoiceDate: true,
-                          customerName: true,
-                          customerPhone: true,
-                          customerAddress: false,
-                          customerAadhar: false,
-                          customerGst: false,
-                          vehicleModel: true,
-                          vehicleColor: true,
-                          vinNumber: true,
-                          engineNo: false,
-                          batteryNumber: false,
-                          exShowroom: true,
-                          gstRate: false,
-                          gstAmount: true,
-                          insurance: false,
-                          rto: false,
-                          subsidy: false,
-                          discount: false,
-                          grandTotal: true,
-                          paymentStatus: true
-                        })}
-                        style={{ backgroundColor: '#ffffff', border: '1px solid #93c5fd', color: '#1e40af', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
-                      >
-                        Reset Defaults
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', fontSize: '0.75rem' }}>
-                    {[
-                      { key: 'invoiceNo', label: 'Invoice No' },
-                      { key: 'invoiceDate', label: 'Invoice Date' },
-                      { key: 'customerName', label: 'Customer Name' },
-                      { key: 'customerPhone', label: 'Mobile Number' },
-                      { key: 'customerAddress', label: 'Address' },
-                      { key: 'customerAadhar', label: 'Aadhaar No' },
-                      { key: 'customerGst', label: 'Customer GSTIN' },
-                      { key: 'vehicleModel', label: 'Vehicle Model' },
-                      { key: 'vehicleColor', label: 'Vehicle Color' },
-                      { key: 'vinNumber', label: 'VIN / Chassis' },
-                      { key: 'engineNo', label: 'Motor / Engine No' },
-                      { key: 'batteryNumber', label: 'Battery / Charger' },
-                      { key: 'exShowroom', label: 'Sale Amount (Base)' },
-                      { key: 'gstRate', label: 'GST Rate %' },
-                      { key: 'gstAmount', label: 'GST Amount (₹)' },
-                      { key: 'insurance', label: 'Insurance (₹)' },
-                      { key: 'rto', label: 'RTO & Tax (₹)' },
-                      { key: 'subsidy', label: 'Govt Subsidy (₹)' },
-                      { key: 'discount', label: 'Discount (₹)' },
-                      { key: 'grandTotal', label: 'Grand Total (₹)' },
-                      { key: 'paymentStatus', label: 'Payment Status' }
-                    ].map((col, idx) => (
-                      <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#1f2937' }}>
-                        <input
-                          type="checkbox"
-                          checked={!!visibleColumns[col.key]}
-                          onChange={(e) => setVisibleColumns({ ...visibleColumns, [col.key]: e.target.checked })}
-                          style={{ cursor: 'pointer' }}
-                        />
-                        <span>{col.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(() => {
-                const dynamicStats = {
-                  count: filteredReportInvoices.length,
-                  totalRevenue: filteredReportInvoices.reduce((s, i) => s + Number(i.grandTotal || 0), 0),
-                  totalTaxable: filteredReportInvoices.reduce((s, i) => s + Number(i.exShowroom || (i.grandTotal * 0.78) || 0), 0),
-                  totalGst: filteredReportInvoices.reduce((s, i) => s + Number(i.gstAmount || Math.round(Number(i.exShowroom || 0) * 0.05) || 0), 0),
-                  fullyPaid: filteredReportInvoices.filter(i => i.paymentStatus === 'Fully Paid').length,
-                  partiallyPaid: filteredReportInvoices.filter(i => i.paymentStatus === 'Partially Paid').length,
-                  unpaid: filteredReportInvoices.filter(i => i.paymentStatus === 'Unpaid').length
-                };
-
-                return (
-                  <div>
-                    {/* 4 Summary Stat Cards */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '20px' }}>
-                      <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '14px', borderRadius: '8px' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          Filtered Sales Revenue
-                        </span>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#15803d', marginTop: '4px' }}>
-                          ₹{dynamicStats.totalRevenue.toLocaleString('en-IN')}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#166534', marginTop: '2px' }}>
-                          {dynamicStats.count} Invoices Matched
-                        </div>
-                      </div>
-
-                      <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', padding: '14px', borderRadius: '8px' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          Filtered Sale Amount (Base)
-                        </span>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1d4ed8', marginTop: '4px' }}>
-                          ₹{dynamicStats.totalTaxable.toLocaleString('en-IN')}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#1e40af', marginTop: '2px' }}>
-                          Ex-Showroom Net Value
-                        </div>
-                      </div>
-
-                      <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '14px', borderRadius: '8px' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          Filtered GST Amount
-                        </span>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#b45309', marginTop: '4px' }}>
-                          ₹{dynamicStats.totalGst.toLocaleString('en-IN')}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#92400e', marginTop: '2px' }}>
-                          CGST (2.5%) + SGST (2.5%)
-                        </div>
-                      </div>
-
-                      <div style={{ backgroundColor: '#faf5ff', border: '1px solid #e9d5ff', padding: '14px', borderRadius: '8px' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b21a8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          Realization Status
-                        </span>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#7e22ce', marginTop: '4px' }}>
-                          {dynamicStats.fullyPaid} Paid
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#6b21a8', marginTop: '2px' }}>
-                          {dynamicStats.partiallyPaid + dynamicStats.unpaid} Due / Partial
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Detailed Filtered Invoice Ledger Table with Dynamic Columns */}
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#111827', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <FileCode size={16} style={{ color: '#2563eb' }} /> Filtered Invoices Report ({filteredReportInvoices.length} records found)
-                        </h4>
-                      </div>
-
-                      <div style={{ maxHeight: '380px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
-                          <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f3f4f6', borderBottom: '1.5px solid #d1d5db' }}>
-                            <tr>
-                              {visibleColumns.invoiceNo && <th style={{ padding: '8px 10px', textAlign: 'left' }}>Inv No</th>}
-                              {visibleColumns.invoiceDate && <th style={{ padding: '8px 10px', textAlign: 'left' }}>Date</th>}
-                              {visibleColumns.customerName && <th style={{ padding: '8px 10px', textAlign: 'left' }}>Customer Name</th>}
-                              {visibleColumns.customerPhone && <th style={{ padding: '8px 10px', textAlign: 'left' }}>Mobile</th>}
-                              {visibleColumns.customerAddress && <th style={{ padding: '8px 10px', textAlign: 'left' }}>Address</th>}
-                              {visibleColumns.customerAadhar && <th style={{ padding: '8px 10px', textAlign: 'left' }}>Aadhaar</th>}
-                              {visibleColumns.customerGst && <th style={{ padding: '8px 10px', textAlign: 'left' }}>GSTIN</th>}
-                              {visibleColumns.vehicleModel && <th style={{ padding: '8px 10px', textAlign: 'left' }}>Model</th>}
-                              {visibleColumns.vehicleColor && <th style={{ padding: '8px 10px', textAlign: 'left' }}>Color</th>}
-                              {visibleColumns.vinNumber && <th style={{ padding: '8px 10px', textAlign: 'left' }}>VIN / Chassis</th>}
-                              {visibleColumns.engineNo && <th style={{ padding: '8px 10px', textAlign: 'left' }}>Motor / Engine</th>}
-                              {visibleColumns.batteryNumber && <th style={{ padding: '8px 10px', textAlign: 'left' }}>Battery No</th>}
-                              {visibleColumns.exShowroom && <th style={{ padding: '8px 10px', textAlign: 'right' }}>Sale Amount (₹)</th>}
-                              {visibleColumns.gstRate && <th style={{ padding: '8px 10px', textAlign: 'center' }}>GST %</th>}
-                              {visibleColumns.gstAmount && <th style={{ padding: '8px 10px', textAlign: 'right' }}>GST Amount (₹)</th>}
-                              {visibleColumns.insurance && <th style={{ padding: '8px 10px', textAlign: 'right' }}>Insurance (₹)</th>}
-                              {visibleColumns.rto && <th style={{ padding: '8px 10px', textAlign: 'right' }}>RTO (₹)</th>}
-                              {visibleColumns.subsidy && <th style={{ padding: '8px 10px', textAlign: 'right' }}>Subsidy (₹)</th>}
-                              {visibleColumns.discount && <th style={{ padding: '8px 10px', textAlign: 'right' }}>Discount (₹)</th>}
-                              {visibleColumns.grandTotal && <th style={{ padding: '8px 10px', textAlign: 'right' }}>Grand Total (₹)</th>}
-                              {visibleColumns.paymentStatus && <th style={{ padding: '8px 10px', textAlign: 'center' }}>Status</th>}
-                              <th style={{ padding: '8px 10px', textAlign: 'center' }}>Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredReportInvoices.length > 0 ? (
-                              filteredReportInvoices.map((inv, idx) => (
-                                <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
-                                  {visibleColumns.invoiceNo && <td style={{ padding: '8px 10px', fontWeight: 700, color: '#059669', fontFamily: 'monospace' }}>#{inv.invoiceNo}</td>}
-                                  {visibleColumns.invoiceDate && <td style={{ padding: '8px 10px', color: '#6b7280' }}>{inv.invoiceDate || inv.createdOn}</td>}
-                                  {visibleColumns.customerName && <td style={{ padding: '8px 10px', fontWeight: 600 }}>{inv.customerName}</td>}
-                                  {visibleColumns.customerPhone && <td style={{ padding: '8px 10px', color: '#4b5563' }}>{inv.customerPhone || inv.customerMobile || 'N/A'}</td>}
-                                  {visibleColumns.customerAddress && <td style={{ padding: '8px 10px', color: '#6b7280', fontSize: '0.72rem' }}>{inv.customerAddress || 'Showroom Direct'}</td>}
-                                  {visibleColumns.customerAadhar && <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{inv.customerAadhar || 'N/A'}</td>}
-                                  {visibleColumns.customerGst && <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{inv.customerGst || 'N/A'}</td>}
-                                  {visibleColumns.vehicleModel && <td style={{ padding: '8px 10px', fontWeight: 600 }}>{inv.vehicleModel}</td>}
-                                  {visibleColumns.vehicleColor && <td style={{ padding: '8px 10px' }}>{inv.vehicleColor || 'Std'}</td>}
-                                  {visibleColumns.vinNumber && <td style={{ padding: '8px 10px', fontFamily: 'monospace', color: '#6b7280', fontSize: '0.7rem' }}>{inv.vinNumber || inv.vin || inv.chassisNo || 'OEM'}</td>}
-                                  {visibleColumns.engineNo && <td style={{ padding: '8px 10px', fontFamily: 'monospace', color: '#6b7280', fontSize: '0.7rem' }}>{inv.engineNo || inv.motorNumber || 'OEM'}</td>}
-                                  {visibleColumns.batteryNumber && <td style={{ padding: '8px 10px', fontSize: '0.7rem' }}>{inv.batteryNumber || inv.batteryNo || 'BAT-OEM'}</td>}
-                                  {visibleColumns.exShowroom && <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600 }}>₹{Number(inv.exShowroom || 0).toLocaleString('en-IN')}</td>}
-                                  {visibleColumns.gstRate && <td style={{ padding: '8px 10px', textAlign: 'center' }}>{inv.gstRate || 5}%</td>}
-                                  {visibleColumns.gstAmount && <td style={{ padding: '8px 10px', textAlign: 'right', color: '#b45309', fontWeight: 600 }}>₹{Number(inv.gstAmount || 0).toLocaleString('en-IN')}</td>}
-                                  {visibleColumns.insurance && <td style={{ padding: '8px 10px', textAlign: 'right' }}>₹{Number(inv.insurance || 0).toLocaleString('en-IN')}</td>}
-                                  {visibleColumns.rto && <td style={{ padding: '8px 10px', textAlign: 'right' }}>₹{Number(inv.rto || 0).toLocaleString('en-IN')}</td>}
-                                  {visibleColumns.subsidy && <td style={{ padding: '8px 10px', textAlign: 'right', color: '#059669' }}>-₹{Number(inv.subsidy || 0).toLocaleString('en-IN')}</td>}
-                                  {visibleColumns.discount && <td style={{ padding: '8px 10px', textAlign: 'right', color: '#dc2626' }}>-₹{Number(inv.discount || 0).toLocaleString('en-IN')}</td>}
-                                  {visibleColumns.grandTotal && <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#15803d' }}>₹{Number(inv.grandTotal || 0).toLocaleString('en-IN')}</td>}
-                                  {visibleColumns.paymentStatus && (
-                                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                                      <span style={{
-                                        fontSize: '0.7rem',
-                                        fontWeight: 700,
-                                        padding: '2px 6px',
-                                        borderRadius: '4px',
-                                        backgroundColor: inv.paymentStatus === 'Fully Paid' ? '#ecfdf5' : '#fef2f2',
-                                        color: inv.paymentStatus === 'Fully Paid' ? '#047857' : '#b91c1c'
-                                      }}>
-                                        {inv.paymentStatus || 'Fully Paid'}
-                                      </span>
-                                    </td>
-                                  )}
-                                  <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
-                                      <button
-                                        type="button"
-                                        className="btn btn-secondary btn-sm"
-                                        style={{ padding: '2px 6px', color: '#16a34a' }}
-                                        onClick={() => handleShareInvoiceWhatsApp(inv)}
-                                        title="Share via WhatsApp"
-                                      >
-                                        <MessageCircle size={12} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="btn btn-secondary btn-sm"
-                                        style={{ padding: '2px 6px', color: '#2563eb' }}
-                                        onClick={() => {
-                                          setIsMonthlyReportOpen(false);
-                                          handleEditInvoice(inv);
-                                        }}
-                                        title="Edit Invoice"
-                                      >
-                                        <Edit2 size={12} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="btn btn-secondary btn-sm"
-                                        style={{ padding: '2px 6px' }}
-                                        onClick={() => {
-                                          setPrintModalConfig({ isOpen: true, type: 'invoice', data: inv });
-                                        }}
-                                        title="Print Preview"
-                                      >
-                                        <Printer size={12} />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))
-                            ) : (
-                              <tr>
-                                <td colSpan={22} style={{ textAlign: 'center', padding: '24px', color: '#9ca3af' }}>
-                                  No invoices match the selected filter criteria. Try adjusting or clearing filters above.
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Global Print Preview Modal */}
       <PrintPreviewModal
         isOpen={printModalConfig.isOpen}
         onClose={() => setPrintModalConfig(prev => ({ ...prev, isOpen: false }))}
         type={printModalConfig.type}
         data={printModalConfig.data}
+        companyProfile={companyProfile}
+        onConvertQuoteToInvoice={(q) => {
+          setPrintModalConfig(prev => ({ ...prev, isOpen: false }));
+          handleConvertQuoteToInvoice(q);
+        }}
+        onConvertBookingToInvoice={(b) => {
+          setPrintModalConfig(prev => ({ ...prev, isOpen: false }));
+          handleConvertBookingToInvoice(b);
+        }}
       />
     </div>
   );

@@ -19,7 +19,14 @@ const warrantyClaimSchema = new mongoose.Schema({
   status: { type: String, default: 'Pending' },
   submissionDate: { type: String, default: () => new Date().toISOString().split('T')[0] },
   settlementDate: { type: String, default: '' },
-  notes: { type: String, default: '' }
+  notes: { type: String, default: '' },
+  // Courier Tracking Details
+  courierPartner: { type: String, default: '' },
+  trackingNo: { type: String, default: '' },
+  courierStatus: { type: String, default: 'Not Dispatched' }, // 'Not Dispatched', 'Dispatched', 'In Transit', 'Delivered'
+  dispatchDate: { type: String, default: '' },
+  deliveryDate: { type: String, default: '' },
+  courierNotes: { type: String, default: '' }
 });
 
 export default mongoose.model('WarrantyClaim', warrantyClaimSchema);

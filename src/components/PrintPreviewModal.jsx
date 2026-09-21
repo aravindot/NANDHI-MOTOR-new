@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Printer, X, Download, Check, ShieldCheck, Wrench, FileText, ShoppingCart, Award, MessageCircle, FileDown } from 'lucide-react';
+import { Printer, X, Download, Check, ShieldCheck, Wrench, FileText, ShoppingCart, Award, MessageCircle, FileDown, Receipt } from 'lucide-react';
 import { generateInvoicePdfAndShare, generateQuotationPdfAndShare, buildTaxInvoicePdf, buildQuotationPdf } from '../utils/pdfShareUtil';
 
 export default function PrintPreviewModal({
@@ -7,7 +7,9 @@ export default function PrintPreviewModal({
   onClose,
   type = 'invoice', // 'invoice' | 'quotation' | 'booking' | 'jobsheet' | 'servicebill' | 'purchase' | 'warranty'
   data = {},
-  companyProfile: propProfile
+  companyProfile: propProfile,
+  onConvertQuoteToInvoice,
+  onConvertBookingToInvoice
 }) {
   const docRef = useRef(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -317,15 +319,13 @@ export default function PrintPreviewModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
                 backgroundColor: '#059669',
                 color: '#ffffff',
                 border: 'none',
+                width: '38px',
                 height: '38px',
-                padding: '0 16px',
-                borderRadius: '6px',
-                fontWeight: 600,
-                fontSize: '0.875rem',
+                padding: 0,
+                borderRadius: '8px',
                 cursor: isGeneratingPdf ? 'wait' : 'pointer',
                 boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15)',
                 opacity: isGeneratingPdf ? 0.7 : 1,
@@ -333,8 +333,7 @@ export default function PrintPreviewModal({
               }}
               title="Send official PDF directly to customer mobile on WhatsApp"
             >
-              <MessageCircle size={16} />
-              <span>{isGeneratingPdf ? 'Generating...' : 'WhatsApp'}</span>
+              <MessageCircle size={18} />
             </button>
 
             {/* Direct Download PDF Button */}
@@ -345,15 +344,13 @@ export default function PrintPreviewModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
                 backgroundColor: '#059669',
                 color: '#ffffff',
                 border: 'none',
+                width: '38px',
                 height: '38px',
-                padding: '0 16px',
-                borderRadius: '6px',
-                fontWeight: 600,
-                fontSize: '0.875rem',
+                padding: 0,
+                borderRadius: '8px',
                 cursor: isGeneratingPdf ? 'wait' : 'pointer',
                 boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15)',
                 opacity: isGeneratingPdf ? 0.7 : 1,
@@ -361,8 +358,7 @@ export default function PrintPreviewModal({
               }}
               title="Download high-resolution A4 PDF document"
             >
-              <FileDown size={16} />
-              <span>PDF</span>
+              <FileDown size={18} />
             </button>
 
             {/* Print Button */}
@@ -372,23 +368,71 @@ export default function PrintPreviewModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
                 backgroundColor: '#059669',
                 color: '#ffffff',
                 border: 'none',
+                width: '38px',
                 height: '38px',
-                padding: '0 16px',
-                borderRadius: '6px',
-                fontWeight: 600,
-                fontSize: '0.875rem',
+                padding: 0,
+                borderRadius: '8px',
                 cursor: 'pointer',
                 boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15)',
                 transition: 'all 0.2s ease'
               }}
+              title="Print Document"
             >
-              <Printer size={16} />
-              <span>Print</span>
+              <Printer size={18} />
             </button>
+
+            {/* Convert to Invoice Button (only for quotation preview) */}
+            {type === 'quotation' && onConvertQuoteToInvoice && (
+              <button
+                onClick={() => onConvertQuoteToInvoice(data)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#047857',
+                  color: '#ffffff',
+                  border: 'none',
+                  width: '38px',
+                  height: '38px',
+                  padding: 0,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15)',
+                  transition: 'all 0.2s ease'
+                }}
+                title="Convert this Quotation directly to a Tax Invoice"
+              >
+                <Receipt size={18} />
+              </button>
+            )}
+
+            {/* Convert to Invoice Button (for booking preview) */}
+            {type === 'booking' && onConvertBookingToInvoice && (
+              <button
+                onClick={() => onConvertBookingToInvoice(data)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#047857',
+                  color: '#ffffff',
+                  border: 'none',
+                  width: '38px',
+                  height: '38px',
+                  padding: 0,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15)',
+                  transition: 'all 0.2s ease'
+                }}
+                title="Convert this Booking to Sale / Tax Invoice"
+              >
+                <Receipt size={18} />
+              </button>
+            )}
 
             {/* Close Button */}
             <button
@@ -397,21 +441,19 @@ export default function PrintPreviewModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
                 backgroundColor: '#374151',
                 color: '#ffffff',
                 border: 'none',
+                width: '38px',
                 height: '38px',
-                padding: '0 16px',
-                borderRadius: '6px',
-                fontWeight: 600,
-                fontSize: '0.875rem',
+                padding: 0,
+                borderRadius: '8px',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
               }}
+              title="Close Preview Modal"
             >
-              <X size={16} />
-              <span>Close</span>
+              <X size={18} />
             </button>
           </div>
         </div>
@@ -657,6 +699,20 @@ export default function PrintPreviewModal({
                   </div>
                 </div>
 
+                {/* Invoice Terms & Conditions */}
+                <div style={{ marginTop: '16px', fontSize: '0.72rem', color: '#4b5563', lineHeight: 1.4 }}>
+                  <strong style={{ display: 'block', color: '#111827', marginBottom: '4px', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                    Terms & Conditions:
+                  </strong>
+                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                    {profile.invoiceTerms || `1. Goods once sold will not be taken back or exchanged.
+2. Warranty is subject to manufacturer's policy and applies from the date of this invoice.
+3. Dealership is not liable for indirect damages or delays beyond our control.
+4. All disputes are subject to local city jurisdiction only.
+5. E. & O.E. (Errors and Omissions Excepted)`}
+                  </div>
+                </div>
+
                 {/* Signature Block */}
                 <div className="doc-signatures" style={{ marginTop: '30px' }}>
                   <div className="doc-sig-line">
@@ -680,11 +736,16 @@ export default function PrintPreviewModal({
                     <p><strong>Quote Date:</strong> {data.createdOn || new Date().toLocaleDateString('en-IN')}</p>
                     <p><strong>Customer Name:</strong> {data.customerName || 'Valued Customer'}</p>
                     <p><strong>Mobile:</strong> {data.customerPhone || 'N/A'}</p>
+                    {data.customerAddress && <p><strong>Address:</strong> {data.customerAddress}</p>}
+                    {data.customerEmail && <p><strong>Email:</strong> {data.customerEmail}</p>}
+                    {data.customerAadhar && <p><strong>Aadhar:</strong> {data.customerAadhar}</p>}
+                    {data.customerGst && <p><strong>GSTIN:</strong> {data.customerGst}</p>}
                   </div>
                   <div>
                     <p><strong>Model:</strong> {data.vehicleModel}</p>
                     <p><strong>Color:</strong> {data.vehicleColor || 'Subject to Availability'}</p>
                     <p><strong>Validity:</strong> 7 Days from date of issuance</p>
+                    {data.executive && <p><strong>Sales Executive:</strong> {data.executive}</p>}
                   </div>
                 </div>
 
@@ -697,9 +758,17 @@ export default function PrintPreviewModal({
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Ex-Showroom Price (Incl. GST)</td>
+                      <td>Ex-Showroom Base Vehicle Price</td>
                       <td style={{ textAlign: 'right' }}>₹{Number(data.exShowroom || 0).toLocaleString('en-IN')}</td>
                     </tr>
+                    {(Number(data.gstRate || 0) > 0 || Number(data.gstAmount || 0) > 0) && (
+                      <tr>
+                        <td>Applicable GST ({data.gstRate !== undefined ? data.gstRate : 5}%)</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, color: '#059669' }}>
+                          +₹{Number(data.gstAmount !== undefined ? data.gstAmount : Math.round(Number(data.exShowroom || 0) * ((data.gstRate !== undefined ? data.gstRate : 5) / 100))).toLocaleString('en-IN')}
+                        </td>
+                      </tr>
+                    )}
                     <tr>
                       <td>Life Tax & RTO Registration Fees</td>
                       <td style={{ textAlign: 'right' }}>₹{Number(data.rto || 0).toLocaleString('en-IN')}</td>
@@ -708,16 +777,28 @@ export default function PrintPreviewModal({
                       <td>Comprehensive Insurance (1 Yr Own Damage + 5 Yr TP)</td>
                       <td style={{ textAlign: 'right' }}>₹{Number(data.insurance || 0).toLocaleString('en-IN')}</td>
                     </tr>
-                    {data.accessories > 0 && (
+                    {Number(data.accessories || 0) > 0 && (
                       <tr>
-                        <td>Essential Accessories Kit</td>
+                        <td>Essential Accessories Kit & Helmet</td>
                         <td style={{ textAlign: 'right' }}>₹{Number(data.accessories).toLocaleString('en-IN')}</td>
                       </tr>
                     )}
-                    {data.extendedWarranty > 0 && (
+                    {Number(data.handling || 0) > 0 && (
+                      <tr>
+                        <td>Logistics, Handling & Showroom PDI</td>
+                        <td style={{ textAlign: 'right' }}>₹{Number(data.handling).toLocaleString('en-IN')}</td>
+                      </tr>
+                    )}
+                    {Number(data.extendedWarranty || 0) > 0 && (
                       <tr>
                         <td>5-Year Extended Warranty Shield</td>
                         <td style={{ textAlign: 'right' }}>₹{Number(data.extendedWarranty).toLocaleString('en-IN')}</td>
+                      </tr>
+                    )}
+                    {Number(data.discount || 0) > 0 && (
+                      <tr style={{ color: '#dc2626' }}>
+                        <td>Dealer Special Discount (-)</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>-₹{Number(data.discount).toLocaleString('en-IN')}</td>
                       </tr>
                     )}
                   </tbody>
@@ -727,6 +808,29 @@ export default function PrintPreviewModal({
                   <div style={{ display: 'flex', justifyContent: 'space-between', width: '320px', padding: '6px 0', borderTop: '2px solid #111827', fontWeight: 800, fontSize: '15px', color: '#059669' }}>
                     <span>Estimated On-Road Price:</span>
                     <span>₹{Number(data.total || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+
+                {/* Terms & Conditions Section */}
+                <div style={{
+                  backgroundColor: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '6px',
+                  padding: '10px 14px',
+                  margin: '18px 0 14px',
+                  fontSize: '10.5px',
+                  lineHeight: 1.5,
+                  color: '#4b5563'
+                }}>
+                  <div style={{ fontWeight: 700, color: '#059669', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '11px' }}>
+                    Terms & Conditions:
+                  </div>
+                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                    {profile.quotationTerms || `1. Prices quoted are valid for 7 days from the date of issuance and subject to manufacturer price revisions.
+2. Final delivery is subject to availability of vehicle stock and color chosen at the time of final booking.
+3. RTO registration, road tax, and insurance charges are subject to statutory revisions by Government authorities.
+4. Full on-road payment is required prior to vehicle invoicing and registration dispatch.
+5. Standard accessories and helmet are supplied according to dealership delivery policy.`}
                   </div>
                 </div>
 
@@ -933,6 +1037,27 @@ export default function PrintPreviewModal({
                   <p style={{ margin: '0 0 6px 0' }}><strong>Claim Amount:</strong> ₹{Number(data.claimAmount || 0).toLocaleString('en-IN')}</p>
                   <p style={{ margin: 0 }}><strong>Failure Notes:</strong> {data.issueDescription || 'Standard manufacturing defect verification'}</p>
                 </div>
+
+                {/* Courier & Dispatch Tracking Information */}
+                {(data.courierPartner || data.trackingNo || data.courierStatus) && (
+                  <div style={{ backgroundColor: '#f0fdf4', padding: '12px 14px', border: '1px solid #bbf7d0', borderRadius: '4px', margin: '14px 0', fontSize: '0.85rem' }}>
+                    <div style={{ fontWeight: 700, color: '#166534', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      🚚 Courier & Dispatch Tracking
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', color: '#1f2937' }}>
+                      <div><strong>Courier Partner:</strong> {data.courierPartner || 'N/A'}</div>
+                      <div><strong>Tracking / AWB No:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{data.trackingNo || 'N/A'}</span></div>
+                      <div><strong>Courier Status:</strong> <span style={{ fontWeight: 600, color: data.courierStatus === 'Delivered' ? '#16a34a' : data.courierStatus === 'In Transit' ? '#2563eb' : '#d97706' }}>{data.courierStatus || 'Not Dispatched'}</span></div>
+                      {data.dispatchDate && <div><strong>Dispatch Date:</strong> {data.dispatchDate}</div>}
+                      {data.deliveryDate && <div><strong>Delivery Date:</strong> {data.deliveryDate}</div>}
+                    </div>
+                    {data.courierNotes && (
+                      <div style={{ marginTop: '6px', fontSize: '0.8rem', color: '#4b5563' }}>
+                        <strong>Dispatch Notes:</strong> {data.courierNotes}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="doc-signatures">
                   <div className="doc-sig-line">Service Advisor Sign</div>

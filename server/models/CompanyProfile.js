@@ -16,7 +16,12 @@ const companyProfileSchema = new mongoose.Schema({
   accountName: { type: String, default: '' },
   accountNumber: { type: String, default: '' },
   ifscCode: { type: String, default: '' },
-  branch: { type: String, default: '' }
-});
+  branch: { type: String, default: '' },
+  upiId: { type: String, default: '' },
+  upiQrImage: { type: String, default: '' },
+  logoUrl: { type: String, default: '' },
+  quotationTerms: { type: String, default: '' },
+  invoiceTerms: { type: String, default: '' }
+}, { strict: false });
 
 export default mongoose.model('CompanyProfile', companyProfileSchema);

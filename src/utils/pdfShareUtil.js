@@ -15,7 +15,12 @@ const DEFAULT_PROFILE = {
   accountNumber: '50200088991234',
   ifscCode: 'HDFC0001234',
   branch: 'Namakkal Main Branch',
-  upiId: 'nandhimotors@hdfcbank'
+  upiId: 'nandhimotors@hdfcbank',
+  quotationTerms: `1. Prices quoted are valid for 7 days from the date of issuance and subject to manufacturer price revisions.
+2. Final delivery is subject to availability of vehicle stock and color chosen at the time of final booking.
+3. RTO registration, road tax, and insurance charges are subject to statutory revisions by Government authorities.
+4. Full on-road payment is required prior to vehicle invoicing and registration dispatch.
+5. Standard accessories and helmet are supplied according to dealership delivery policy.`
 };
 
 function getStoredProfile() {
@@ -412,12 +417,15 @@ export function buildQuotationPdf(quote, customProfile = null) {
   const qDate = quote.createdOn || quote.date || new Date().toLocaleDateString('en-IN');
 
   const ex = Number(quote.exShowroom || quote.basePrice || 0);
+  const gstRate = quote.gstRate !== undefined ? Number(quote.gstRate) : 5;
+  const gstAmount = Number(quote.gstAmount !== undefined ? quote.gstAmount : Math.round(ex * (gstRate / 100)));
   const rto = Number(quote.rto || quote.rtoCharges || 0);
   const ins = Number(quote.insurance || 0);
   const acc = Number(quote.accessories || 0);
+  const handling = Number(quote.handling || 0);
   const extWarranty = Number(quote.extendedWarranty || 0);
   const disc = Number(quote.discount || 0);
-  const total = Number(quote.total || (ex + rto + ins + acc + extWarranty - disc) || 0);
+  const total = Number(quote.total || (ex + gstAmount + rto + ins + acc + handling + extWarranty - disc) || 0);
 
   // 1. BRAND HEADER
   doc.setFont('helvetica', 'bold');
@@ -443,9 +451,21 @@ export function buildQuotationPdf(quote, customProfile = null) {
   doc.setTextColor(255, 255, 255);
   doc.text('OFFICIAL ON-ROAD PRICE QUOTATION', 105, 28.2, { align: 'center' });
 
+  const custAddr = quote.customerAddress || quote.address || '';
+  const custEmail = quote.customerEmail || quote.email || '';
+  const custAadhar = quote.customerAadhar || quote.aadhar || '';
+  const custGst = quote.customerGst || quote.gstin || '';
+  const exec = quote.executive || quote.salesExecutive || '';
+
   // 2. 2-COLUMN QUOTATION META
-  const leftMeta = `Quote ID: #${qId}\nQuote Date: ${qDate}\nCustomer Name: ${custName}`;
-  const rightMeta = `Mobile Number: ${custPhone}\nVehicle Model: ${vehModel}\nColor / Validity: ${vehColor} (7 Days Validity)`;
+  let leftMeta = `Quote ID: #${qId}\nQuote Date: ${qDate}\nCustomer Name: ${custName}\nMobile: ${custPhone}`;
+  if (custAddr) leftMeta += `\nAddress: ${custAddr}`;
+  if (custEmail) leftMeta += `\nEmail: ${custEmail}`;
+  if (custAadhar) leftMeta += `\nAadhar: ${custAadhar}`;
+  if (custGst) leftMeta += ` | GSTIN: ${custGst}`;
+
+  let rightMeta = `Vehicle Model: ${vehModel}\nColor / Validity: ${vehColor} (7 Days Validity)`;
+  if (exec) rightMeta += `\nSales Executive: ${exec}`;
 
   autoTable(doc, {
     startY: 34,
@@ -474,13 +494,24 @@ export function buildQuotationPdf(quote, customProfile = null) {
 
   // 3. TABLE
   const quoteRows = [
-    { name: 'Ex-Showroom Price (Incl. GST)', amount: formatRs(ex) },
-    { name: 'Life Tax & RTO Registration Fees', amount: formatRs(rto) },
-    { name: 'Comprehensive Insurance (1 Yr Own Damage + 5 Yr TP)', amount: formatRs(ins) }
+    { name: 'Ex-Showroom Base Vehicle Price', amount: formatRs(ex) }
   ];
 
+  if (gstRate > 0 || gstAmount > 0) {
+    quoteRows.push({ name: `Applicable GST Tax (${gstRate}%)`, amount: formatRs(gstAmount) });
+  }
+
+  quoteRows.push(
+    { name: 'Life Tax & RTO Registration Fees', amount: formatRs(rto) },
+    { name: 'Comprehensive Insurance (1 Yr Own Damage + 5 Yr TP)', amount: formatRs(ins) }
+  );
+
   if (acc > 0) {
-    quoteRows.push({ name: 'Essential Accessories Kit', amount: formatRs(acc) });
+    quoteRows.push({ name: 'Essential Accessories Kit & Helmet', amount: formatRs(acc) });
+  }
+
+  if (handling > 0) {
+    quoteRows.push({ name: 'Logistics, Handling & Showroom PDI', amount: formatRs(handling) });
   }
 
   if (extWarranty > 0) {
@@ -537,9 +568,35 @@ export function buildQuotationPdf(quote, customProfile = null) {
   doc.setTextColor(21, 128, 61);
   doc.text(formatRs(total), 155, yPos + 13.5, { align: 'center' });
 
-  yPos += 24;
+  yPos += 22;
 
-  // 5. SIGNATURES
+  // 5. TERMS & CONDITIONS
+  const termsText = profile.quotationTerms || DEFAULT_PROFILE.quotationTerms || '';
+  if (termsText) {
+    doc.setFillColor(249, 250, 251);
+    doc.setDrawColor(229, 231, 235);
+    doc.setLineWidth(0.2);
+
+    const splitTerms = doc.splitTextToSize(termsText, 174);
+    const boxHeight = Math.max(14, splitTerms.length * 3.4 + 7);
+    doc.roundedRect(14, yPos, 182, boxHeight, 1.5, 1.5, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(5, 150, 105);
+    doc.text('TERMS & CONDITIONS:', 18, yPos + 4.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(55, 65, 81);
+    doc.text(splitTerms, 18, yPos + 8.5);
+
+    yPos += boxHeight + 8;
+  } else {
+    yPos += 4;
+  }
+
+  // 6. SIGNATURES
   doc.setDrawColor(17, 24, 39);
   doc.setLineWidth(0.3);
   doc.line(18, yPos, 70, yPos);

@@ -14,7 +14,10 @@ const leadSchema = new mongoose.Schema({
   price: { type: Number },
   leadType: { type: String, default: 'Hot' },
   status: { type: String, default: 'Entered' },
+  entryDate: { type: String },
   followupDate: { type: String },
+  reminder: { type: String, default: 'ON' },
+  reminderTime: { type: String },
   note: { type: String },
   createdOn: { type: String, default: () => new Date().toLocaleDateString('en-IN') }
 });

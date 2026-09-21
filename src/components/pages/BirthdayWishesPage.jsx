@@ -1,319 +1,328 @@
 import React, { useState, useMemo } from 'react';
-import { Cake, Calendar, Gift, MessageCircle, Phone, Send, Sparkles, Check, Search } from 'lucide-react';
+import {
+  Cake,
+  Calendar,
+  Gift,
+  MessageCircle,
+  Phone,
+  Send,
+  Sparkles,
+  Check,
+  Search,
+  CheckCircle,
+  Copy,
+  Bike,
+  User,
+  PartyPopper
+} from 'lucide-react';
 
-export default function BirthdayWishesPage({
-  customers = []
-}) {
+export default function BirthdayWishesPage({ customers = [] }) {
   const [activeType, setActiveType] = useState('Birthday'); // 'Birthday' or 'Anniversary'
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedEventId, setSelectedEventId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
-  // Mock list merged with existing customers
   const [events, setEvents] = useState(() => {
-    return [
-      {
-        id: 'EVT-1',
-        customerName: 'Rajesh Kumar',
-        mobile: '9842155670',
-        vehicleModel: 'Honda Activa 6G',
-        vehicleRegNo: 'TN-37-BJ-5120',
-        dob: '1988-08-14', // Today's date!
-        deliveryDate: '2024-08-14',
-        type: 'Birthday',
-        discountCode: 'BDAY15-RAJESH',
-        sentWish: false
-      },
-      {
-        id: 'EVT-2',
-        customerName: 'K. Senthil Nathan',
-        mobile: '9443312345',
-        vehicleModel: 'Honda Shine 125',
-        vehicleRegNo: 'TN-38-K-8812',
-        dob: '1992-08-15', // Tomorrow
-        deliveryDate: '2023-08-15',
-        type: 'Birthday',
-        discountCode: 'BDAY15-SENTHIL',
-        sentWish: false
-      },
-      {
-        id: 'EVT-3',
-        customerName: 'P. Murugan',
-        mobile: '9842567890',
-        vehicleModel: 'Honda SP 125',
-        vehicleRegNo: 'TN-45-AS-9821',
-        dob: '1985-08-18',
-        deliveryDate: '2025-08-14', // 1st Year Bike Anniversary Today!
-        type: 'Anniversary',
-        discountCode: 'ANNI10-MURUGAN',
-        sentWish: false
-      },
-      {
-        id: 'EVT-4',
-        customerName: 'Deepak Sharma',
-        mobile: '9443219800',
-        vehicleModel: 'Honda Dio 125',
-        vehicleRegNo: 'TN-37-CD-3321',
-        dob: '1990-08-20',
-        deliveryDate: '2024-08-20',
-        type: 'Anniversary',
-        discountCode: 'ANNI10-DEEPAK',
-        sentWish: false
-      },
-      {
-        id: 'EVT-5',
-        customerName: 'Anitha Ramesh',
-        mobile: '9894123456',
-        vehicleModel: 'Honda Activa 6G',
-        vehicleRegNo: 'TN-38-BZ-4510',
-        dob: '1995-08-25',
-        deliveryDate: '2023-08-25',
-        type: 'Birthday',
-        discountCode: 'BDAY15-ANITHA',
-        sentWish: false
-      }
-    ];
+    return [];
   });
 
   const filteredEvents = useMemo(() => {
-    return events.filter(e => {
-      const matchType = e.type === activeType;
+    return events.filter((e) => {
+      const matchType = activeType === 'ALL' || e.type === activeType;
       const matchSearch =
         e.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        e.mobile.includes(searchQuery) ||
-        e.vehicleModel.toLowerCase().includes(searchQuery.toLowerCase());
+        e.mobile.includes(searchQuery);
       return matchType && matchSearch;
     });
   }, [events, activeType, searchQuery]);
 
+  const activeEvent =
+    events.find((e) => e.id === selectedEventId && (activeType === 'ALL' || e.type === activeType)) ||
+    (filteredEvents.length > 0 ? filteredEvents[0] : null);
+
   const generateMessage = (item) => {
+    if (!item) return '';
     if (item.type === 'Birthday') {
-      return `Dear ${item.customerName}, Happy Birthday from Nandhi Motors! 🎉🎂 Wishing you joy and happy rides on your ${item.vehicleModel}. As a special birthday gift, enjoy 15% OFF on your next vehicle service using coupon code ${item.discountCode}. Valid for this month! 🏍️✨`;
+      return `Dear ${item.customerName}, Happy Birthday from Nandhi Motors! 🎉🎂 Wishing you joy and happy rides. As a special birthday gift, enjoy 15% OFF on your next vehicle service using coupon code ${item.discountCode}. Valid for this month! 🏍️✨`;
     } else {
-      return `Dear ${item.customerName}, Happy Vehicle Purchase Anniversary from Nandhi Motors! 🎊 Celebrating happy miles on your ${item.vehicleModel} (${item.vehicleRegNo}). Enjoy 10% OFF on General Service & Water Wash with coupon ${item.discountCode}. Drive safe! 🛵✨`;
+      return `Dear ${item.customerName}, Happy Vehicle Purchase Anniversary from Nandhi Motors! 🎊 Celebrating happy miles on your vehicle (${item.vehicleRegNo}). Enjoy 10% OFF on General Service & Water Wash with coupon ${item.discountCode}. Drive safe! 🛵✨`;
     }
   };
 
   const handleSendWhatsApp = (item) => {
+    if (!item) return;
     const text = encodeURIComponent(generateMessage(item));
     const cleanMobile = item.mobile.replace(/\D/g, '');
     const fullMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
     window.open(`https://wa.me/${fullMobile}?text=${text}`, '_blank');
 
-    setEvents(prev => prev.map(e => e.id === item.id ? { ...e, sentWish: true } : e));
+    setEvents((prev) => prev.map((e) => (e.id === item.id ? { ...e, sentWish: true } : e)));
   };
 
-  const handleCopyText = (item) => {
-    const text = generateMessage(item);
-    navigator.clipboard.writeText(text);
-    setCopiedId(item.id);
+  const handleCopyCode = (code, id) => {
+    navigator.clipboard.writeText(code);
+    setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2500);
   };
 
+  const bdayCount = events.filter((e) => e.type === 'Birthday').length;
+  const anniCount = events.filter((e) => e.type === 'Anniversary').length;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Header Banner */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Cake style={{ color: '#059669' }} /> Customer Greetings & Anniversaries
-          </h2>
-          <p style={{ color: '#6b7280', fontSize: '0.9rem', marginTop: '2px' }}>
-            Automated birthday & vehicle delivery anniversary greetings with personalized service discount vouchers.
-          </p>
-        </div>
-      </div>
-
-      {/* Mode Selector */}
-      <div style={{ display: 'flex', gap: '12px' }}>
-        <button
+    <div style={{ animation: 'fadeIn 0.2s ease' }}>
+      {/* Sub Tabs */}
+      <div className="sub-tabs-container">
+        <span
+          className={`sub-tab ${activeType === 'Birthday' ? 'active' : ''}`}
           onClick={() => setActiveType('Birthday')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 20px',
-            borderRadius: '8px',
-            fontSize: '0.9rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            backgroundColor: activeType === 'Birthday' ? '#059669' : '#ffffff',
-            color: activeType === 'Birthday' ? '#ffffff' : '#374151',
-            border: activeType === 'Birthday' ? '1px solid #059669' : '1px solid #e5e7eb',
-            boxShadow: activeType === 'Birthday' ? '0 2px 4px rgba(5,150,105,0.2)' : 'none'
-          }}
         >
-          <Cake size={18} /> Customer Birthdays
-        </button>
-
-        <button
+          <Cake size={14} style={{ marginRight: '6px' }} /> Customer Birthdays
+        </span>
+        <span
+          className={`sub-tab ${activeType === 'Anniversary' ? 'active' : ''}`}
           onClick={() => setActiveType('Anniversary')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 20px',
-            borderRadius: '8px',
-            fontSize: '0.9rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            backgroundColor: activeType === 'Anniversary' ? '#059669' : '#ffffff',
-            color: activeType === 'Anniversary' ? '#ffffff' : '#374151',
-            border: activeType === 'Anniversary' ? '1px solid #059669' : '1px solid #e5e7eb',
-            boxShadow: activeType === 'Anniversary' ? '0 2px 4px rgba(5,150,105,0.2)' : 'none'
-          }}
         >
-          <Gift size={18} /> Vehicle Delivery Anniversaries
-        </button>
+          <Gift size={14} style={{ marginRight: '6px' }} /> Purchase Anniversaries
+        </span>
+        <span
+          className={`sub-tab ${activeType === 'ALL' ? 'active' : ''}`}
+          onClick={() => setActiveType('ALL')}
+        >
+          <Sparkles size={14} style={{ marginRight: '6px' }} /> All Occasions
+        </span>
       </div>
 
-      {/* Greetings Feed Table Card */}
-      <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: '380px' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-            <input
-              type="text"
-              placeholder="Search customer, mobile, vehicle..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+      {/* 2-Column Master-Detail Layout */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1.2fr 1fr',
+          gap: '24px'
+        }}
+      >
+        {/* LEFT COLUMN: Occasions Ledger */}
+        <div className="card">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <h3 className="card-title">
+              <PartyPopper size={18} style={{ color: '#059669' }} /> Customer Occasions Ledger
+            </h3>
+            <div className="quick-search">
+              <Search size={14} className="quick-search-icon" />
+              <input
+                type="text"
+                placeholder="Search name / bike..."
+                style={{ width: '160px', padding: '6px 10px 6px 28px', fontSize: '0.78rem' }}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="card-body" style={{ maxHeight: '720px', overflowY: 'auto', padding: '12px' }}>
+            {/* Top Metric Summary Strip */}
+            <div
               style={{
-                width: '100%',
-                padding: '8px 12px 8px 36px',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem'
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '8px',
+                backgroundColor: '#f9fafb',
+                padding: '10px',
+                borderRadius: '6px',
+                border: '1px solid #e5e7eb',
+                marginBottom: '10px',
+                textAlign: 'center'
               }}
-            />
+            >
+              <div>
+                <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Total Occasions</span>
+                <strong style={{ fontSize: '0.9rem', color: '#1f2937' }}>{events.length}</strong>
+              </div>
+              <div>
+                <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>🎂 Birthdays</span>
+                <strong style={{ fontSize: '0.9rem', color: '#059669' }}>{bdayCount}</strong>
+              </div>
+              <div>
+                <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>🎁 Anniversaries</span>
+                <strong style={{ fontSize: '0.9rem', color: '#3b82f6' }}>{anniCount}</strong>
+              </div>
+            </div>
+
+            {/* Event List Items */}
+            {filteredEvents && filteredEvents.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {filteredEvents.map((evt) => {
+                  const isSelected = activeEvent && activeEvent.id === evt.id;
+
+                  return (
+                    <div
+                      key={evt.id}
+                      onClick={() => setSelectedEventId(evt.id)}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        border: isSelected ? '2px solid #059669' : '1px solid #e5e7eb',
+                        backgroundColor: isSelected ? '#f0fdf4' : '#ffffff',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        boxShadow: isSelected ? '0 2px 4px rgba(5, 150, 105, 0.1)' : 'none'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '1.1rem' }}>{evt.type === 'Birthday' ? '🎂' : '🛵'}</span>
+                          <div>
+                            <strong style={{ fontSize: '0.88rem', color: '#1f2937' }}>{evt.customerName}</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#6b7280', marginLeft: '6px' }}>#{evt.id}</span>
+                          </div>
+                        </div>
+
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            backgroundColor: evt.sentWish ? '#ecfdf5' : '#fffbeb',
+                            color: evt.sentWish ? '#059669' : '#d97706',
+                            border: '1px solid',
+                            borderColor: evt.sentWish ? '#bbf7d0' : '#fde68a'
+                          }}
+                        >
+                          {evt.sentWish ? '✓ Wish Sent' : 'Pending Wish'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#6b7280', marginTop: '4px' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Phone size={11} color="#059669" /> {evt.mobile}
+                        </span>
+                        <span style={{ color: '#059669', fontWeight: 500 }}>{evt.vehicleModel}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: '#9ca3af' }}>
+                <Gift size={36} strokeWidth={1} style={{ marginBottom: '8px' }} />
+                <p style={{ fontSize: '0.82rem' }}>No occasions match your criteria.</p>
+              </div>
+            )}
           </div>
         </div>
 
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {filteredEvents.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9ca3af' }}>
-              No upcoming {activeType.toLowerCase()} records found.
-            </div>
-          ) : (
-            filteredEvents.map(evt => {
-              const msg = generateMessage(evt);
-              const isToday = evt.id === 'EVT-1' || evt.id === 'EVT-3';
+        {/* RIGHT COLUMN: WhatsApp Greetings Card Preview */}
+        <div className="card">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="card-title">
+              <Gift size={18} style={{ color: '#059669' }} /> WhatsApp Greeting Card
+            </h3>
+            {activeEvent && (
+              <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                Occasion #{activeEvent.id}
+              </span>
+            )}
+          </div>
 
-              return (
-                <div
-                  key={evt.id}
-                  style={{
-                    border: isToday ? '2px solid #a7f3d0' : '1px solid #e5e7eb',
-                    backgroundColor: isToday ? '#fafdfb' : '#ffffff',
-                    borderRadius: '12px',
-                    padding: '18px 20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '14px',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                      <div style={{
-                        width: '42px',
-                        height: '42px',
-                        borderRadius: '50%',
-                        backgroundColor: isToday ? '#ecfdf5' : '#f3f4f6',
-                        color: isToday ? '#059669' : '#4b5563',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        {activeType === 'Birthday' ? <Cake size={22} /> : <Gift size={22} />}
-                      </div>
-
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontWeight: 700, color: '#111827', fontSize: '1rem' }}>{evt.customerName}</span>
-                          {isToday && (
-                            <span style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
-                              TODAY! 🎂
-                            </span>
-                          )}
-                          {evt.sentWish && (
-                            <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              <Check size={12} /> Wish Sent
-                            </span>
-                          )}
-                        </div>
-
-                        <div style={{ fontSize: '0.825rem', color: '#6b7280', marginTop: '2px' }}>
-                          {evt.mobile} &bull; {evt.vehicleModel} ({evt.vehicleRegNo})
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{
-                        backgroundColor: '#fef3c7',
-                        color: '#d97706',
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        letterSpacing: '0.5px'
-                      }}>
-                        🎟️ {evt.discountCode}
-                      </span>
-                    </div>
+          <div className="card-body">
+            {activeEvent ? (
+              <div className="invoice-container">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #059669', paddingBottom: '12px' }}>
+                  <div>
+                    <div className="invoice-title" style={{ textAlign: 'left', margin: 0, fontSize: '1.25rem' }}>NANDHI MOTORS</div>
+                    <p style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 600, margin: '2px 0 0' }}>
+                      Customer Relationship & Milestone Greeting Card
+                    </p>
                   </div>
-
-                  {/* Message Preview Box */}
-                  <div style={{ backgroundColor: '#f9fafb', padding: '12px 14px', borderRadius: '8px', border: '1px solid #f3f4f6', fontSize: '0.875rem', color: '#374151', lineHeight: 1.5 }}>
-                    {msg}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                    <button
-                      onClick={() => handleCopyText(evt)}
+                  <div style={{ textAlign: 'right' }}>
+                    <span
+                      className="badge"
                       style={{
-                        padding: '8px 14px',
-                        borderRadius: '8px',
-                        border: '1px solid #d1d5db',
-                        backgroundColor: '#ffffff',
-                        color: '#374151',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
+                        backgroundColor: activeEvent.type === 'Birthday' ? '#ec4899' : '#059669',
+                        color: '#fff',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700
                       }}
                     >
-                      {copiedId === evt.id ? <Check size={15} style={{ color: '#059669' }} /> : <Sparkles size={15} />}
-                      <span>{copiedId === evt.id ? 'Copied Message!' : 'Copy Greeting Text'}</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleSendWhatsApp(evt)}
-                      style={{
-                        padding: '8px 16px',
-                        borderRadius: '8px',
-                        border: 'none',
-                        backgroundColor: '#25D366',
-                        color: '#ffffff',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        boxShadow: '0 2px 4px rgba(37,211,102,0.3)'
-                      }}
-                    >
-                      <MessageCircle size={16} />
-                      <span>Send WhatsApp Greeting</span>
-                    </button>
+                      {activeEvent.type === 'Birthday' ? '🎂 BIRTHDAY EVENT' : '🛵 BIKE ANNIVERSARY'}
+                    </span>
                   </div>
                 </div>
-              );
-            })
-          )}
+
+                {/* 2-Column Info Grid */}
+                <div className="invoice-grid-2" style={{ marginTop: '16px' }}>
+                  <div>
+                    <div className="section-title">Customer Particulars</div>
+                    <p><strong>Name:</strong> {activeEvent.customerName}</p>
+                    <p>
+                      <strong>Mobile:</strong>{' '}
+                      <a href={`tel:${activeEvent.mobile}`} style={{ color: '#059669', fontWeight: 600, textDecoration: 'none' }}>
+                        {activeEvent.mobile}
+                      </a>
+                    </p>
+                    <p><strong>Vehicle:</strong> {activeEvent.vehicleModel}</p>
+                    <p><strong>Reg No:</strong> {activeEvent.vehicleRegNo}</p>
+                  </div>
+
+                  <div>
+                    <div className="section-title">Milestone Offer</div>
+                    <p><strong>Occasion:</strong> {activeEvent.type}</p>
+                    <p><strong>Coupon Code:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#059669' }}>{activeEvent.discountCode}</span></p>
+                    <p><strong>Discount Offer:</strong> {activeEvent.type === 'Birthday' ? '15% OFF Service' : '10% OFF Service'}</p>
+                    <p><strong>Validity:</strong> 30 Days</p>
+                  </div>
+                </div>
+
+                {/* WhatsApp Message Preview Bubble */}
+                <div
+                  style={{
+                    margin: '16px 0',
+                    padding: '14px',
+                    borderRadius: '10px',
+                    backgroundColor: '#dcf8c6',
+                    border: '1px solid #b2dfdb',
+                    fontSize: '0.84rem',
+                    color: '#111827',
+                    lineHeight: 1.6,
+                    position: 'relative'
+                  }}
+                >
+                  <div style={{ fontSize: '0.72rem', color: '#065f46', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>
+                    📱 WhatsApp Message Template:
+                  </div>
+                  {generateMessage(activeEvent)}
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginTop: '16px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 12px' }}
+                    onClick={() => handleSendWhatsApp(activeEvent)}
+                  >
+                    <Send size={14} /> Send WhatsApp Greeting
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 12px' }}
+                    onClick={() => handleCopyCode(activeEvent.discountCode, activeEvent.id)}
+                  >
+                    {copiedId === activeEvent.id ? <Check size={14} color="#059669" /> : <Copy size={14} />}
+                    {copiedId === activeEvent.id ? 'Copied Code!' : 'Copy Code'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: '#9ca3af' }}>
+                <Gift size={36} strokeWidth={1} style={{ marginBottom: '8px' }} />
+                <p>Select a customer event from the ledger on the left to preview message.</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

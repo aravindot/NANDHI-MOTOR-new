@@ -209,15 +209,14 @@ export default function VehicleListPage({ vehicles = [], setVehicles, onNavigate
               </div>
               <div>
                 <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>🎨 Color Variants</span>
-                <strong style={{ fontSize: '0.9rem', color: '#059669' }}>{allColors.length || 5}</strong>
+                <strong style={{ fontSize: '0.9rem', color: '#059669' }}>{allColors.length}</strong>
               </div>
               <div>
                 <span style={{ display: 'block', fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>🏷️ Avg Price</span>
                 <strong style={{ fontSize: '0.9rem', color: '#3b82f6' }}>
-                  ₹
                   {vehicles.length > 0
-                    ? Math.round(vehicles.reduce((acc, v) => acc + (Number(v.price) || 82000), 0) / vehicles.length).toLocaleString('en-IN')
-                    : '85,000'}
+                    ? `₹${Math.round(vehicles.reduce((acc, v) => acc + (Number(v.price) || 0), 0) / vehicles.length).toLocaleString('en-IN')}`
+                    : '₹0'}
                 </strong>
               </div>
             </div>

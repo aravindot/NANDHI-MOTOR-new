@@ -159,8 +159,8 @@ export default function SettingsPage({
               <Wrench size={24} />
             </div>
             <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 4px 0', color: '#111827' }}>Service Labor Types</h3>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: '#6b7280' }}>Configure default service types and labor charges.</p>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 4px 0', color: '#111827' }}>Service Labour Types</h3>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#6b7280' }}>Configure default service types and labour charges.</p>
             </div>
           </div>
         </div>
@@ -204,7 +204,7 @@ export default function SettingsPage({
               <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {activeModal === 'terms' && <><FileText size={20} color="#059669" /> Document Terms & Conditions</>}
                 {activeModal === 'layout' && <><Settings size={20} color="#4b5563" /> Feature Preview & Layouts</>}
-                {activeModal === 'labor' && <><Wrench size={20} color="#2563eb" /> Service Labor & Work Types</>}
+                {activeModal === 'labor' && <><Wrench size={20} color="#2563eb" /> Service Labour & Work Types</>}
               </h3>
               <button 
                 onClick={() => setActiveModal(null)} 

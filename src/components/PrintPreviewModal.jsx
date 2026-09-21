@@ -532,7 +532,7 @@ export default function PrintPreviewModal({
                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
                       Vehicle Specifications & Serial Nos
                     </div>
-                    <p style={{ margin: '2px 0' }}><strong>Model & Variant:</strong> {data.vehicleModel || 'Honda Two-Wheeler'}</p>
+                    <p style={{ margin: '2px 0' }}><strong>Model & Variant:</strong> {data.vehicleModel || ''}</p>
                     <p style={{ margin: '2px 0' }}><strong>Color / Shade:</strong> {data.vehicleColor || 'Standard'}</p>
                     <p style={{ margin: '2px 0' }}><strong>Chassis / VIN No:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{data.vinNumber || data.vin || data.chassisNo || 'ME4JF911NK00892'}</span></p>
                     <p style={{ margin: '2px 0' }}><strong>Motor / Engine No:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{data.engineNo || data.motorNumber || 'JF91E918231'}</span></p>

@@ -87,6 +87,8 @@ export default function WarrantyClaimPage({
   const [statusFilter, setStatusFilter] = useState('All');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClaimForPrint, setSelectedClaimForPrint] = useState(null);
+  const [editingClaimId, setEditingClaimId] = useState(null);
+  const [selectedClaimDetail, setSelectedClaimDetail] = useState(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -187,40 +189,7 @@ export default function WarrantyClaimPage({
     });
   }, [claims, searchQuery, statusFilter]);
 
-  const handleCreateClaim = async (e) => {
-    e.preventDefault();
-    if (!formData.customerName || !formData.vehicleRegNo || !formData.defectivePart) {
-      alert('Please fill in Customer Name, Vehicle Reg No, and Defective Part.');
-      return;
-    }
-
-    const newClaim = {
-      id: `WC-${String(claims.length + 1).padStart(2, '0')}`,
-      ...formData,
-      claimAmount: Number(formData.claimAmount || 0),
-      status: 'Submitted',
-      submissionDate: new Date().toISOString().split('T')[0],
-      settlementDate: ''
-    };
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/warranties`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newClaim)
-      });
-      if (res.ok) {
-        const saved = await res.json();
-        setClaims([saved, ...claims]);
-      } else {
-        setClaims([newClaim, ...claims]);
-      }
-    } catch (err) {
-      console.error('Failed to sync claim with MongoDB:', err);
-      setClaims([newClaim, ...claims]);
-    }
-
-    setIsModalOpen(false);
+  const resetClaimForm = () => {
     setFormData({
       customerName: '',
       customerMobile: '',
@@ -238,6 +207,111 @@ export default function WarrantyClaimPage({
       oemRefNo: '',
       notes: ''
     });
+  };
+
+  const handleCreateClaim = async (e) => {
+    e.preventDefault();
+    if (!formData.customerName || !formData.vehicleRegNo || !formData.defectivePart) {
+      alert('Please fill in Customer Name, Vehicle Reg No, and Defective Part.');
+      return;
+    }
+
+    const claimPayload = {
+      ...formData,
+      claimAmount: Number(formData.claimAmount || 0),
+      submissionDate: new Date().toISOString().split('T')[0],
+      settlementDate: ''
+    };
+
+    if (editingClaimId) {
+      const existingClaim = claims.find(c => c.id === editingClaimId);
+      const updatedClaim = {
+        ...existingClaim,
+        ...claimPayload,
+        id: editingClaimId,
+        status: existingClaim?.status || 'Submitted',
+        submissionDate: existingClaim?.submissionDate || claimPayload.submissionDate,
+        settlementDate: existingClaim?.settlementDate || ''
+      };
+
+      const nextClaims = claims.map(c => c.id === editingClaimId ? updatedClaim : c);
+      setClaims(nextClaims);
+
+      try {
+        await fetch(`${API_BASE_URL}/api/warranties`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedClaim)
+        });
+      } catch (err) {
+        console.error('Failed to sync edited claim with MongoDB:', err);
+      }
+    } else {
+      const newClaim = {
+        id: `WC-${String(claims.length + 1).padStart(2, '0')}`,
+        ...claimPayload,
+        status: 'Submitted',
+        settlementDate: ''
+      };
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/warranties`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newClaim)
+        });
+        if (res.ok) {
+          const saved = await res.json();
+          setClaims([saved, ...claims]);
+        } else {
+          setClaims([newClaim, ...claims]);
+        }
+      } catch (err) {
+        console.error('Failed to sync claim with MongoDB:', err);
+        setClaims([newClaim, ...claims]);
+      }
+    }
+
+    setEditingClaimId(null);
+    setIsModalOpen(false);
+    resetClaimForm();
+  };
+
+  const handleOpenEditClaim = (claim) => {
+    setEditingClaimId(claim.id);
+    setFormData({
+      customerName: claim.customerName || '',
+      customerMobile: claim.customerMobile || '',
+      vehicleModel: claim.vehicleModel || 'Honda Activa 6G',
+      vehicleRegNo: claim.vehicleRegNo || '',
+      chassisNo: claim.chassisNo || '',
+      engineNo: claim.engineNo || '',
+      dateOfSale: claim.dateOfSale || new Date().toISOString().split('T')[0],
+      odometerKm: claim.odometerKm || '',
+      defectivePart: claim.defectivePart || '',
+      partCode: claim.partCode || '',
+      defectCategory: claim.defectCategory || 'Electrical',
+      issueDescription: claim.issueDescription || '',
+      claimAmount: claim.claimAmount ?? '',
+      oemRefNo: claim.oemRefNo || '',
+      notes: claim.notes || ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteClaim = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this warranty claim?')) return;
+
+    const nextClaims = claims.filter(c => c.id !== id);
+    setClaims(nextClaims);
+
+    try {
+      await fetch(`${API_BASE_URL}/api/warranties/${id}`, {
+        method: 'DELETE'
+      });
+    } catch (err) {
+      console.error('Failed to delete claim from MongoDB:', err);
+    }
   };
 
   
@@ -292,6 +366,10 @@ export default function WarrantyClaimPage({
     setPrintModalConfig({ isOpen: true, type: 'warranty', data: claim });
   };
 
+  const openClaimDetails = (claim) => {
+    setSelectedClaimDetail(claim);
+  };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Approved':
@@ -325,17 +403,21 @@ export default function WarrantyClaimPage({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       {/* Header Banner */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-        <div style={{ paddingBottom: '12px', borderBottom: '1px solid #e5e7eb', width: '100%' }}>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-            <ShieldCheck style={{ color: '#059669' }} /> Warranty Claims Hub
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', paddingBottom: '12px', borderBottom: '1px solid #e5e7eb' }}>
+        <div>
+          <h2 style={{ fontSize: '1.45rem', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '10px', margin: 0, textTransform: 'uppercase' }}>
+            <ShieldCheck style={{ color: '#059669' }} /> WARRANTY CLAIM
           </h2>
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setEditingClaimId(null);
+            resetClaimForm();
+            setIsModalOpen(true);
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -357,29 +439,29 @@ export default function WarrantyClaimPage({
 
       
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '16px', borderBottom: '2px solid #e5e7eb', paddingBottom: '0px', marginBottom: '8px', marginTop: '10px' }}>
+      <div style={{ display: 'flex', gap: '16px', borderBottom: '2px solid #e5e7eb', paddingBottom: '0px', marginBottom: '4px', marginTop: '4px' }}>
         <button
           onClick={() => setActiveTab('claims')}
           style={{
-            background: 'none', border: 'none', padding: '12px 16px', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer',
+            background: 'none', border: 'none', padding: '8px 16px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
             color: activeTab === 'claims' ? '#059669' : '#6b7280',
             borderBottom: activeTab === 'claims' ? '3px solid #059669' : '3px solid transparent',
-            marginBottom: '-2px'
+            marginBottom: '-2px', textTransform: 'uppercase'
           }}
         >
-          Claims Hub
+          CLAIM
         </button>
         <button
           onClick={() => setActiveTab('tracking')}
           style={{
-            background: 'none', border: 'none', padding: '12px 16px', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer',
+            background: 'none', border: 'none', padding: '8px 16px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
             color: activeTab === 'tracking' ? '#059669' : '#6b7280',
             borderBottom: activeTab === 'tracking' ? '3px solid #059669' : '3px solid transparent',
             marginBottom: '-2px',
-            display: 'flex', alignItems: 'center', gap: '6px'
+            display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase'
           }}
         >
-          <Truck size={16} /> Courier & Dispatch Tracking
+          <Truck size={16} /> COURIER
         </button>
       </div>
 
@@ -387,38 +469,34 @@ export default function WarrantyClaimPage({
         <>
 
       {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
-        <div style={{ backgroundColor: '#ffffff', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Total Claims Filed</div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827' }}>{stats.total}</div>
-          
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
+        <div style={{ backgroundColor: '#ffffff', padding: '10px 14px', borderRadius: '6px', border: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Total Claims Filed</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827' }}>{stats.total}</div>
         </div>
 
-        <div style={{ backgroundColor: '#ffffff', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Under OEM Review</div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#2563eb' }}>{stats.underReview + stats.submitted}</div>
-          
+        <div style={{ backgroundColor: '#ffffff', padding: '10px 14px', borderRadius: '6px', border: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Under OEM Review</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#2563eb' }}>{stats.underReview + stats.submitted}</div>
         </div>
 
-        <div style={{ backgroundColor: '#ffffff', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Approved / Settled</div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#059669' }}>{stats.approved}</div>
-          
+        <div style={{ backgroundColor: '#ffffff', padding: '10px 14px', borderRadius: '6px', border: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Approved / Settled</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#059669' }}>{stats.approved}</div>
         </div>
 
-        <div style={{ backgroundColor: '#ffffff', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Total Reimbursed Value</div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#047857' }}>₹{stats.totalReimbursed.toLocaleString('en-IN')}</div>
-          
+        <div style={{ backgroundColor: '#ffffff', padding: '10px 14px', borderRadius: '6px', border: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Total Reimbursed Value</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#047857' }}>₹{stats.totalReimbursed.toLocaleString('en-IN')}</div>
         </div>
       </div>
 
       {/* Main Claims Table Card */}
       <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
         {/* Search & Filter Bar */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ position: 'relative', minWidth: '280px', flex: '1', maxWidth: '450px' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ position: 'relative', minWidth: '250px', flex: '1', maxWidth: '400px' }}>
+            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
             <input
               type="text"
               placeholder="Search claims..."
@@ -426,25 +504,25 @@ export default function WarrantyClaimPage({
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
                 width: '100%',
-                padding: '9px 12px 9px 36px',
-                borderRadius: '8px',
+                padding: '7px 10px 7px 30px',
+                borderRadius: '6px',
                 border: '1px solid #d1d5db',
-                fontSize: '0.875rem',
+                fontSize: '0.8rem',
                 outline: 'none'
               }}
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: '#6b7280', fontWeight: 500 }}>Status:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.8rem', color: '#6b7280', fontWeight: 500 }}>Status:</span>
             {['All', 'Submitted', 'Under OEM Review', 'Approved', 'Rejected'].map(st => (
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
                 style={{
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  fontSize: '0.8rem',
+                  padding: '4px 10px',
+                  borderRadius: '4px',
+                  fontSize: '0.75rem',
                   fontWeight: statusFilter === st ? 600 : 500,
                   backgroundColor: statusFilter === st ? '#ecfdf5' : '#f9fafb',
                   color: statusFilter === st ? '#059669' : '#4b5563',
@@ -462,61 +540,62 @@ export default function WarrantyClaimPage({
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
             <thead>
-              <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: 600, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                <th style={{ padding: '12px 18px' }}>Claim ID & Date</th>
-                <th style={{ padding: '12px 18px' }}>Customer & Vehicle</th>
-                <th style={{ padding: '12px 18px' }}>Defective Component</th>
-                <th style={{ padding: '12px 18px' }}>Category & KM</th>
-                <th style={{ padding: '12px 18px' }}>Claim Value</th>
-                <th style={{ padding: '12px 18px' }}>OEM Ref / Status</th>
-                <th style={{ padding: '12px 18px', textAlign: 'right' }}>Actions</th>
+              <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <th style={{ padding: '10px 14px' }}>Claim</th>
+                <th style={{ padding: '10px 14px' }}>Customer</th>
+                <th style={{ padding: '10px 14px' }}>Vehicle</th>
+                <th style={{ padding: '10px 14px' }}>Part</th>
+                <th style={{ padding: '10px 14px' }}>Status</th>
+                <th style={{ padding: '10px 14px', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredClaims.length === 0 ? (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '40px 20px', color: '#9ca3af' }}>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '40px 20px', color: '#9ca3af' }}>
                     No warranty claims found matching the search criteria.
                   </td>
                 </tr>
               ) : (
                 filteredClaims.map((claim) => (
-                  <tr key={claim.id} style={{ borderBottom: '1px solid #f3f4f6', transition: 'background-color 0.15s ease' }}>
-                    <td style={{ padding: '14px 18px' }}>
-                      <div style={{ fontWeight: 600, color: '#111827' }}>{claim.id}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Submitted: {claim.submissionDate}</div>
+                  <tr
+                    key={claim.id}
+                    onClick={() => openClaimDetails(claim)}
+                    style={{
+                      borderBottom: '1px solid #f3f4f6',
+                      transition: 'background-color 0.15s ease',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <td style={{ padding: '10px 14px' }}>
+                      <div style={{ fontWeight: 700, color: '#111827', fontSize: '0.83rem' }}>{claim.id}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>{claim.submissionDate}</div>
                     </td>
-                    <td style={{ padding: '14px 18px' }}>
-                      <div style={{ fontWeight: 600, color: '#1f2937' }}>{claim.customerName}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 500 }}>{claim.vehicleRegNo}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{claim.vehicleModel}</div>
+                    <td style={{ padding: '10px 14px' }}>
+                      <div style={{ fontWeight: 600, color: '#1f2937', fontSize: '0.82rem' }}>{claim.customerName}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>{claim.customerMobile || 'No mobile'}</div>
                     </td>
-                    <td style={{ padding: '14px 18px' }}>
-                      <div style={{ fontWeight: 500, color: '#1f2937' }}>{claim.defectivePart}</div>
-                      {claim.partCode && <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Code: {claim.partCode}</div>}
+                    <td style={{ padding: '10px 14px' }}>
+                      <div style={{ fontWeight: 500, color: '#1f2937', fontSize: '0.82rem' }}>{claim.vehicleRegNo}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>{claim.vehicleModel}</div>
                     </td>
-                    <td style={{ padding: '14px 18px' }}>
-                      <span style={{ backgroundColor: '#f3f4f6', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 500, color: '#374151' }}>
-                        {claim.defectCategory}
-                      </span>
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>{claim.odometerKm} KM</div>
+                    <td style={{ padding: '10px 14px' }}>
+                      <div style={{ fontWeight: 500, color: '#1f2937', fontSize: '0.82rem' }}>{claim.defectivePart}</div>
+                      {claim.partCode && <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>Code: {claim.partCode}</div>}
                     </td>
-                    <td style={{ padding: '14px 18px' }}>
-                      <div style={{ fontWeight: 700, color: '#111827' }}>₹{claim.claimAmount.toLocaleString('en-IN')}</div>
+                    <td style={{ padding: '10px 14px' }}>
+                      {getStatusBadge(claim.status)}
                     </td>
-                    <td style={{ padding: '14px 18px' }}>
-                      <div style={{ marginBottom: '4px' }}>{getStatusBadge(claim.status)}</div>
-                      {claim.oemRefNo ? (
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>OEM: {claim.oemRefNo}</div>
-                      ) : (
-                        <div style={{ fontSize: '0.75rem', color: '#9ca3af', fontStyle: 'italic' }}>Pending OEM Ack</div>
-                      )}
-                    </td>
-                    <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+                    <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
                         <select
                           value={claim.status}
-                          onChange={(e) => handleUpdateStatus(claim.id, e.target.value)}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleUpdateStatus(claim.id, e.target.value);
+                          }}
                           style={{
                             padding: '4px 8px',
                             borderRadius: '6px',
@@ -534,7 +613,50 @@ export default function WarrantyClaimPage({
                         </select>
 
                         <button
-                          onClick={() => printClaim(claim)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditClaim(claim);
+                          }}
+                          title="Edit Warranty Claim"
+                          style={{
+                            padding: '6px',
+                            borderRadius: '6px',
+                            border: '1px solid #d1d5db',
+                            backgroundColor: '#ffffff',
+                            color: '#374151',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Edit3 size={15} />
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClaim(claim.id);
+                          }}
+                          title="Delete Warranty Claim"
+                          style={{
+                            padding: '6px',
+                            borderRadius: '6px',
+                            border: '1px solid #fecaca',
+                            backgroundColor: '#fff1f2',
+                            color: '#dc2626',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <XCircle size={15} />
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            printClaim(claim);
+                          }}
                           title="Print Warranty Claim Sheet"
                           style={{
                             padding: '6px',
@@ -564,19 +686,19 @@ export default function WarrantyClaimPage({
       ) : (
         <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', backgroundColor: '#f9fafb' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem', color: '#374151', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Truck size={18} style={{ color: '#059669' }} /> Manage Courier & Return Dispatch
+            <h3 style={{ margin: 0, fontSize: '1rem', color: '#374151', display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase' }}>
+              <Truck size={18} style={{ color: '#059669' }} /> MANAGE COURIER & RETURN DISPATCH
             </h3>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
               <thead style={{ backgroundColor: '#f9fafb', color: '#4b5563', borderBottom: '1px solid #e5e7eb' }}>
                 <tr>
-                  <th style={{ padding: '12px 18px', fontWeight: 600 }}>Claim Details</th>
-                  <th style={{ padding: '12px 18px', fontWeight: 600 }}>Customer & Vehicle</th>
-                  <th style={{ padding: '12px 18px', fontWeight: 600 }}>Defective Part</th>
-                  <th style={{ padding: '12px 18px', fontWeight: 600 }}>Dispatch Status</th>
-                  <th style={{ padding: '12px 18px', fontWeight: 600, textAlign: 'right' }}>Update Tracking</th>
+                  <th style={{ padding: '10px 14px', fontWeight: 600 }}>Claim Details</th>
+                  <th style={{ padding: '10px 14px', fontWeight: 600 }}>Customer & Vehicle</th>
+                  <th style={{ padding: '10px 14px', fontWeight: 600 }}>Defective Part</th>
+                  <th style={{ padding: '10px 14px', fontWeight: 600 }}>Dispatch Status</th>
+                  <th style={{ padding: '10px 14px', fontWeight: 600, textAlign: 'right' }}>Update Tracking</th>
                 </tr>
               </thead>
               <tbody>
@@ -589,24 +711,24 @@ export default function WarrantyClaimPage({
                 ) : (
                   filteredClaims.map((claim) => (
                     <tr key={claim.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                      <td style={{ padding: '14px 18px' }}>
-                        <div style={{ fontWeight: 600, color: '#111827' }}>{claim.id}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '2px' }}>{claim.dateOfSale}</div>
+                      <td style={{ padding: '10px 14px' }}>
+                        <div style={{ fontWeight: 600, color: '#111827', fontSize: '0.85rem' }}>{claim.id}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '2px' }}>{claim.dateOfSale}</div>
                       </td>
-                      <td style={{ padding: '14px 18px' }}>
-                        <div style={{ fontWeight: 500, color: '#374151' }}>{claim.customerName}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '2px' }}>Reg: {claim.vehicleRegNo}</div>
+                      <td style={{ padding: '10px 14px' }}>
+                        <div style={{ fontWeight: 500, color: '#374151', fontSize: '0.85rem' }}>{claim.customerName}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '2px' }}>Reg: {claim.vehicleRegNo}</div>
                       </td>
-                      <td style={{ padding: '14px 18px' }}>
-                        <div style={{ fontWeight: 500, color: '#374151' }}>{claim.defectivePart}</div>
-                        {claim.partCode && <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Code: {claim.partCode}</div>}
+                      <td style={{ padding: '10px 14px' }}>
+                        <div style={{ fontWeight: 500, color: '#374151', fontSize: '0.85rem' }}>{claim.defectivePart}</div>
+                        {claim.partCode && <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>Code: {claim.partCode}</div>}
                       </td>
-                      <td style={{ padding: '14px 18px' }}>
+                      <td style={{ padding: '10px 14px' }}>
                         <div style={{
                           display: 'inline-block',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.7rem',
                           fontWeight: 600,
                           backgroundColor: claim.dispatchStatus === 'Delivered' ? '#ecfdf5' : claim.dispatchStatus === 'Dispatched' ? '#eff6ff' : claim.dispatchStatus === 'In Transit' ? '#fffbeb' : '#f3f4f6',
                           color: claim.dispatchStatus === 'Delivered' ? '#059669' : claim.dispatchStatus === 'Dispatched' ? '#2563eb' : claim.dispatchStatus === 'In Transit' ? '#d97706' : '#4b5563'
@@ -614,12 +736,12 @@ export default function WarrantyClaimPage({
                           {claim.dispatchStatus || 'Pending Dispatch'}
                         </div>
                         {claim.trackingNo && (
-                          <div style={{ fontSize: '0.75rem', color: '#059669', marginTop: '4px', fontWeight: 500 }}>
+                          <div style={{ fontSize: '0.7rem', color: '#059669', marginTop: '4px', fontWeight: 500 }}>
                             {claim.courierPartner} : {claim.trackingNo}
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+                      <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                         <button
                           onClick={() => setTrackingModalConfig({
                             isOpen: true,
@@ -669,8 +791,9 @@ export default function WarrantyClaimPage({
             boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)'
           }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShieldCheck style={{ color: '#059669' }} size={22} /> File Manufacturer Warranty Claim
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase' }}>
+                <ShieldCheck style={{ color: '#059669' }} size={22} />
+                {editingClaimId ? 'EDIT MANUFACTURER WARRANTY CLAIM' : 'FILE MANUFACTURER WARRANTY CLAIM'}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -786,8 +909,8 @@ export default function WarrantyClaimPage({
                 </div>
               </div>
 
-              {/* Defective Part & Defect Category */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '16px' }}>
+              {/* Defective Part, Part Code & Defect Category */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
                     Defective Part Name *
@@ -795,9 +918,21 @@ export default function WarrantyClaimPage({
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Starter Motor, Fuel Pump, Shock Absorber"
+                    placeholder="e.g. Starter Motor..."
                     value={formData.defectivePart}
                     onChange={(e) => setFormData({ ...formData, defectivePart: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                    Part Code
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 12345-ABC"
+                    value={formData.partCode}
+                    onChange={(e) => setFormData({ ...formData, partCode: e.target.value })}
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}
                   />
                 </div>
@@ -875,10 +1010,180 @@ export default function WarrantyClaimPage({
                   type="submit"
                   style={{ padding: '10px 22px', borderRadius: '8px', border: 'none', backgroundColor: '#059669', color: '#ffffff', fontWeight: 600, cursor: 'pointer' }}
                 >
-                  Submit Warranty Claim
+                  {editingClaimId ? 'Update Warranty Claim' : 'Submit Warranty Claim'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Tracking Modal */}
+      {trackingModalConfig.isOpen && trackingModalConfig.claim && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 1000, padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff', borderRadius: '16px', maxWidth: '400px', width: '100%', padding: '24px',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+          }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 16px 0', color: '#111827', display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase' }}>
+              <Truck size={20} style={{ color: '#059669' }} /> UPDATE COURIER TRACKING
+            </h3>
+            <form onSubmit={handleUpdateTracking} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Dispatch Status</label>
+                <select
+                  value={trackingModalConfig.dispatchStatus}
+                  onChange={(e) => setTrackingModalConfig(prev => ({ ...prev, dispatchStatus: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}
+                >
+                  <option value="Pending Dispatch">Pending Dispatch</option>
+                  <option value="Dispatched">Dispatched</option>
+                  <option value="In Transit">In Transit</option>
+                  <option value="Delivered">Delivered</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Courier Partner</label>
+                <input
+                  type="text"
+                  placeholder="e.g. BlueDart, DTDC"
+                  value={trackingModalConfig.courierPartner}
+                  onChange={(e) => setTrackingModalConfig(prev => ({ ...prev, courierPartner: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>Tracking Number</label>
+                <input
+                  type="text"
+                  placeholder="Tracking / AWB Number"
+                  value={trackingModalConfig.trackingNo}
+                  onChange={(e) => setTrackingModalConfig(prev => ({ ...prev, trackingNo: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setTrackingModalConfig({ isOpen: false, claim: null, courierPartner: '', trackingNo: '', dispatchStatus: 'Pending Dispatch' })}
+                  style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: '#ffffff', color: '#4b5563', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ padding: '10px 22px', borderRadius: '8px', border: 'none', backgroundColor: '#059669', color: '#ffffff', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Save Tracking
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {selectedClaimDetail && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '20px'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '700px',
+            backgroundColor: '#ffffff',
+            borderRadius: '16px',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.12)',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 20px',
+              borderBottom: '1px solid #e5e7eb',
+              backgroundColor: '#f9fafb'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#111827' }}>{selectedClaimDetail.id}</h3>
+              <button
+                type="button"
+                onClick={() => setSelectedClaimDetail(null)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#6b7280',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px 16px' }}>
+              <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Customer</span><strong>{selectedClaimDetail.customerName}</strong></div>
+              <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Mobile</span><strong>{selectedClaimDetail.customerMobile || '—'}</strong></div>
+              <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Vehicle</span><strong>{selectedClaimDetail.vehicleRegNo}</strong></div>
+              <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Model</span><strong>{selectedClaimDetail.vehicleModel}</strong></div>
+              <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Defective Part</span><strong>{selectedClaimDetail.defectivePart}</strong></div>
+              <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Part Code</span><strong>{selectedClaimDetail.partCode || '—'}</strong></div>
+              <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Category</span><strong>{selectedClaimDetail.defectCategory}</strong></div>
+              <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Odometer</span><strong>{selectedClaimDetail.odometerKm || '—'} KM</strong></div>
+              <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Claim Amount</span><strong>₹{Number(selectedClaimDetail.claimAmount || 0).toLocaleString('en-IN')}</strong></div>
+              <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Status</span>{getStatusBadge(selectedClaimDetail.status)}</div>
+              <div style={{ gridColumn: '1 / -1' }}><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Issue Description</span><div style={{ marginTop: '4px', color: '#374151', lineHeight: 1.6 }}>{selectedClaimDetail.issueDescription || 'No issue description provided.'}</div></div>
+              <div style={{ gridColumn: '1 / -1' }}><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Notes</span><div style={{ marginTop: '4px', color: '#374151', lineHeight: 1.6 }}>{selectedClaimDetail.notes || 'No notes.'}</div></div>
+            </div>
+
+            <div style={{ padding: '0 20px 20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setSelectedClaimDetail(null)}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: '#ffffff',
+                  color: '#374151',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedClaimDetail(null);
+                  printClaim(selectedClaimDetail);
+                }}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#059669',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Print
+              </button>
+            </div>
           </div>
         </div>
       )}

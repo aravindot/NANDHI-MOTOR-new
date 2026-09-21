@@ -304,20 +304,66 @@ export default function SpareInventoryPage({
                           <span style={{ fontSize: '0.72rem', color: '#6b7280', marginLeft: '6px' }}>#{spare.id}</span>
                         </div>
 
-                        <span
-                          style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            backgroundColor: isOut ? '#fef2f2' : isLow ? '#fffbeb' : '#ecfdf5',
-                            color: isOut ? '#dc2626' : isLow ? '#d97706' : '#059669',
-                            border: '1px solid',
-                            borderColor: isOut ? '#fecaca' : isLow ? '#fde68a' : '#bbf7d0'
-                          }}
-                        >
-                          {isOut ? 'Out of Stock' : `${qty} in Stock`}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEdit(spare);
+                            }}
+                            title="Edit spare"
+                            style={{
+                              border: '1px solid #d1d5db',
+                              backgroundColor: '#ffffff',
+                              color: '#374151',
+                              borderRadius: '6px',
+                              width: '28px',
+                              height: '28px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(spare.id);
+                            }}
+                            title="Delete spare"
+                            style={{
+                              border: '1px solid #fecaca',
+                              backgroundColor: '#fff1f2',
+                              color: '#dc2626',
+                              borderRadius: '6px',
+                              width: '28px',
+                              height: '28px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                          <span
+                            style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              backgroundColor: isOut ? '#fef2f2' : isLow ? '#fffbeb' : '#ecfdf5',
+                              color: isOut ? '#dc2626' : isLow ? '#d97706' : '#059669',
+                              border: '1px solid',
+                              borderColor: isOut ? '#fecaca' : isLow ? '#fde68a' : '#bbf7d0'
+                            }}
+                          >
+                            {isOut ? 'Out of Stock' : `${qty} in Stock`}
+                          </span>
+                        </div>
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#6b7280', marginTop: '4px' }}>

@@ -225,7 +225,7 @@ export default function DashboardOverview({ leads = [], onNavigate }) {
                           {lead.mobile}
                         </a>
                       </td>
-                      <td>{lead.vehicle || 'Honda Model'}</td>
+                      <td>{lead.vehicle || ''}</td>
                       <td>
                         <span
                           className="badge"

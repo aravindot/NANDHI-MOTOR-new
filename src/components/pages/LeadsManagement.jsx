@@ -192,6 +192,7 @@ export default function LeadsManagement({
     invoiceDate: new Date().toISOString().split('T')[0],
     customerName: '',
     customerPhone: '',
+    customerBirthday: '',
     customerAddress: '',
     customerAadhar: '',
     customerGst: '',
@@ -573,6 +574,7 @@ export default function LeadsManagement({
       ...prev,
       customerName: match.name || match.customerName || prev.customerName,
       customerPhone: match.mobile || match.customerPhone || prev.customerPhone,
+      customerBirthday: match.birthday || match.customerBirthday || prev.customerBirthday,
       customerAddress: match.address || match.customerAddress || prev.customerAddress,
       customerEmail: match.email || match.customerEmail || prev.customerEmail,
       customerAadhar: match.aadhar || match.customerAadhar || prev.customerAadhar,
@@ -689,6 +691,7 @@ export default function LeadsManagement({
       invoiceDate: inv.invoiceDate || new Date().toISOString().split('T')[0],
       customerName: inv.customerName || '',
       customerPhone: inv.customerPhone || inv.customerMobile || '',
+      customerBirthday: inv.customerBirthday || '',
       customerAddress: inv.customerAddress || '',
       customerAadhar: inv.customerAadhar || '',
       customerGst: (inv.customerGst || '').toUpperCase(),
@@ -2713,15 +2716,25 @@ export default function LeadsManagement({
                     />
                   </div>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Customer Address</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    
-                    value={invoiceFormData.customerAddress}
-                    onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerAddress: e.target.value })}
-                  />
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Customer Birthday</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={invoiceFormData.customerBirthday || ''}
+                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerBirthday: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Customer Address</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={invoiceFormData.customerAddress}
+                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerAddress: e.target.value })}
+                    />
+                  </div>
                 </div>
               </div>
 

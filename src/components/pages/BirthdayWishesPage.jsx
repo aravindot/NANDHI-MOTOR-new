@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Cake,
   Calendar,
@@ -16,15 +16,54 @@ import {
   PartyPopper
 } from 'lucide-react';
 
-export default function BirthdayWishesPage({ customers = [] }) {
+export default function BirthdayWishesPage({ customers = [], invoices = [] }) {
   const [activeType, setActiveType] = useState('Birthday'); // 'Birthday' or 'Anniversary'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
-  const [events, setEvents] = useState(() => {
-    return [];
-  });
+  const [events, setEvents] = useState([]);
+
+  useEffect(() => {
+    const loadedEvents = [];
+    
+    // Parse Invoices for Birthdays and Anniversaries
+    if (invoices && invoices.length > 0) {
+      invoices.forEach((inv, index) => {
+        // Birthdays
+        if (inv.customerBirthday) {
+          loadedEvents.push({
+            id: `bday-${inv.invoiceNo || index}`,
+            type: 'Birthday',
+            date: inv.customerBirthday, // YYYY-MM-DD
+            customerName: inv.customerName || 'Unknown',
+            mobile: inv.customerPhone || inv.customerMobile || '',
+            vehicleRegNo: inv.vehicleModel || '',
+            discountCode: 'BDAY15'
+          });
+        }
+        
+        // Anniversaries
+        if (inv.invoiceDate || inv.createdOn) {
+          const dateStr = inv.invoiceDate || inv.createdOn; // Usually YYYY-MM-DD or DD/MM/YYYY
+          // Only process if it's in YYYY-MM-DD format for simple demo
+          if (dateStr.includes('-')) {
+             loadedEvents.push({
+                id: `anni-${inv.invoiceNo || index}`,
+                type: 'Anniversary',
+                date: dateStr,
+                customerName: inv.customerName || 'Unknown',
+                mobile: inv.customerPhone || inv.customerMobile || '',
+                vehicleRegNo: inv.vehicleModel || '',
+                discountCode: 'ANNI10'
+             });
+          }
+        }
+      });
+    }
+    
+    setEvents(loadedEvents);
+  }, [invoices]);
 
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {

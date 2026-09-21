@@ -9,6 +9,7 @@ const invoiceSchema = new mongoose.Schema({
   customerAddress: { type: String },
   customerAadhar: { type: String },
   customerGst: { type: String },
+  customerBirthday: { type: String, default: '' },
   vehicleModel: { type: String, required: true },
   vehicleColor: { type: String, required: true },
   vinNumber: { type: String },

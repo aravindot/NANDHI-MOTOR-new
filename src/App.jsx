@@ -1087,6 +1087,7 @@ export default function App() {
           ) : activeTab === 'management' && activeSubTab === 'birthday' ? (
             <BirthdayWishesPage
               customers={customers}
+              invoices={invoices}
             />
           ) : activeTab === 'management' && activeSubTab === 'redeem' ? (
             <RedeemPointsPage

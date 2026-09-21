@@ -140,13 +140,10 @@ export default function CompanyProfilePage({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', animation: 'fadeIn 0.3s ease', color: '#1f2937' }}>
       
       {/* Title Header */}
-      <div>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+      <div style={{ paddingBottom: '12px', borderBottom: '1px solid #e5e7eb', width: '100%' }}>
+        <h2 style={{ fontSize: '1.45rem', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
           <Building2 style={{ color: '#059669' }} /> Dealership Company Profile & Settings
         </h2>
-        <p style={{ color: '#6b7280', fontSize: '0.9rem', marginTop: '4px', marginBottom: 0 }}>
-          Update showroom credentials, bank account, UPI QR code, and quotation terms.
-        </p>
       </div>
 
       {/* Success Toasts */}

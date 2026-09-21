@@ -87,9 +87,8 @@ export default function SettingsPage({
     <div style={{ animation: 'fadeIn 0.2s ease', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
       {/* Title Bar */}
-      <div>
-        <h2 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#111827' }}>Application Settings</h2>
-        <p style={{ color: '#6b7280', fontSize: '0.9rem', marginTop: '4px' }}>Manage system configurations and dealership policies.</p>
+      <div style={{ paddingBottom: '12px', borderBottom: '1px solid #e5e7eb', width: '100%' }}>
+        <h2 style={{ fontSize: '1.45rem', fontWeight: 700, color: '#111827', margin: 0 }}>Application Settings</h2>
       </div>
 
       {saveSuccess && (

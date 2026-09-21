@@ -328,13 +328,10 @@ export default function WarrantyClaimPage({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Header Banner */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ paddingBottom: '12px', borderBottom: '1px solid #e5e7eb', width: '100%' }}>
+          <h2 style={{ fontSize: '1.45rem', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
             <ShieldCheck style={{ color: '#059669' }} /> Warranty Claims Hub
           </h2>
-          <p style={{ color: '#6b7280', fontSize: '0.9rem', marginTop: '2px' }}>
-            Track manufacturer OEM parts replacement warranty claims, inspect defect categories, and manage reimbursement status.
-          </p>
         </div>
 
         <button

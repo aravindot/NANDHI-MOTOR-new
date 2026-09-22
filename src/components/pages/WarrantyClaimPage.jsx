@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ShieldCheck, Plus, Search, Filter, Printer, CheckCircle, Clock, XCircle, AlertTriangle, FileText, Check, ChevronDown, Truck, Edit3 } from 'lucide-react';
+import { ShieldCheck, Plus, Search, Filter, Printer, CheckCircle, Clock, XCircle, AlertTriangle, FileText, Check, ChevronDown, Truck, Edit3, Mail } from 'lucide-react';
 import PrintPreviewModal from '../PrintPreviewModal';
 import { API_BASE_URL } from '../../config/api';
+import { buildWarrantyClaimMail } from '../../utils/warrantyMailUtil';
 
 export default function WarrantyClaimPage({
   customers = [],
   vehicles = [],
-  spares = []
+  spares = [],
+  companyProfile = {}
 }) {
   const [printModalConfig, setPrintModalConfig] = useState({ isOpen: false, type: 'warranty', data: null });
   const [activeTab, setActiveTab] = useState('claims');
@@ -370,6 +372,19 @@ export default function WarrantyClaimPage({
     setSelectedClaimDetail(claim);
   };
 
+  const handleSendClaimMail = (claim) => {
+    const payload = buildWarrantyClaimMail({ claim, companyProfile });
+    if (!payload.to) {
+      alert('Please add the company email in the Company Profile before sending warranty claim mail.');
+      return;
+    }
+
+    const mailtoUrl = payload.mailto;
+    if (typeof window !== 'undefined') {
+      window.location.href = mailtoUrl;
+    }
+  };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Approved':
@@ -611,6 +626,26 @@ export default function WarrantyClaimPage({
                           <option value="Approved">Approved</option>
                           <option value="Rejected">Rejected</option>
                         </select>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSendClaimMail(claim);
+                          }}
+                          title="Send Warranty Claim to Company Mail"
+                          style={{
+                            padding: '6px',
+                            borderRadius: '6px',
+                            border: '1px solid #bfdbfe',
+                            backgroundColor: '#eff6ff',
+                            color: '#1d4ed8',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Mail size={15} />
+                        </button>
 
                         <button
                           onClick={(e) => {
@@ -1164,6 +1199,27 @@ export default function WarrantyClaimPage({
                 }}
               >
                 Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedClaimDetail(null);
+                  handleSendClaimMail(selectedClaimDetail);
+                }}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #bfdbfe',
+                  backgroundColor: '#eff6ff',
+                  color: '#1d4ed8',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Mail size={15} /> Mail to Company
               </button>
               <button
                 type="button"

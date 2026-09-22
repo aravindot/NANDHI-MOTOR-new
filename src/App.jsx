@@ -1203,6 +1203,7 @@ export default function App() {
               customers={customers}
               vehicles={vehicles}
               spares={spares}
+              companyProfile={companyProfile}
             />
           ) : activeTab === 'management' && activeSubTab === 'executives' ? (
             <ExecutivesPage />

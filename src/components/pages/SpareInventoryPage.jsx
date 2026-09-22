@@ -39,7 +39,7 @@ export default function SpareInventoryPage({
 
   const [priceWithGst, setPriceWithGst] = useState(0);
 
-  // Auto-calculate Price with GST
+  // Auto-calculate Price with GST and default showroom MRP from dealer cost
   useEffect(() => {
     const dealer = parseFloat(formData.dealerPrice || 0);
     const gst = parseFloat(formData.gstRate || 0);
@@ -49,7 +49,15 @@ export default function SpareInventoryPage({
     } else {
       setPriceWithGst(0);
     }
-  }, [formData.dealerPrice, formData.gstRate]);
+
+    if (Number(formData.dealerPrice || 0) > 0 && (!formData.mrp || Number(formData.mrp) <= 0)) {
+      const autoMrp = Math.round(Number(formData.dealerPrice || 0) * 1.35);
+      setFormData((prev) => ({
+        ...prev,
+        mrp: prev.mrp && Number(prev.mrp) > 0 ? prev.mrp : String(autoMrp)
+      }));
+    }
+  }, [formData.dealerPrice, formData.gstRate, formData.mrp]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -112,6 +120,7 @@ export default function SpareInventoryPage({
     const qty = parseInt(formData.quantity);
     const dealerPriceVal = parseFloat(formData.dealerPrice);
     const mrpVal = parseFloat(formData.mrp || dealerPriceVal * 1.35);
+    const showroomPrice = Number.isFinite(mrpVal) && mrpVal > 0 ? mrpVal : dealerPriceVal;
 
     if (editingSpare) {
       const updatedList = spares.map((s) =>
@@ -122,10 +131,10 @@ export default function SpareInventoryPage({
               quantity: qty,
               stock: qty,
               dealerPrice: dealerPriceVal,
-              unitPrice: dealerPriceVal,
+              unitPrice: showroomPrice,
               gstRate: parseInt(formData.gstRate),
               priceWithGst: priceWithGst,
-              mrp: mrpVal,
+              mrp: showroomPrice,
               location: formData.location
             }
           : s
@@ -144,10 +153,10 @@ export default function SpareInventoryPage({
         quantity: qty,
         stock: qty,
         dealerPrice: dealerPriceVal,
-        unitPrice: dealerPriceVal,
+        unitPrice: showroomPrice,
         gstRate: parseInt(formData.gstRate),
         priceWithGst: priceWithGst,
-        mrp: mrpVal,
+        mrp: showroomPrice,
         location: formData.location,
         createdOn: new Date().toLocaleDateString('en-IN')
       };

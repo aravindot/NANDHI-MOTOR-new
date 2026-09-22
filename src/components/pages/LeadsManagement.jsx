@@ -164,9 +164,7 @@ export default function LeadsManagement({
   // Booking Form State with localStorage Persistence
   const [bookings, setBookings] = useState(() => {
     const saved = localStorage.getItem('nandhi_bookings');
-    return saved ? JSON.parse(saved) : [
-      { id: 'BK-01', customerName: 'Rajesh Kumar', mobile: '9842155670', vehicleModel: (vehicleList && vehicleList[0] && vehicleList[0].name) || 'Honda Activa 6G', vehicleColor: (allVehicleColors && allVehicleColors[0]) || 'Blue', bookingDate: '2026-08-14', deliveryDate: '2026-08-20', bookingAmount: 5000, paymentMode: 'UPI', createdOn: '14/08/2026' }
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {

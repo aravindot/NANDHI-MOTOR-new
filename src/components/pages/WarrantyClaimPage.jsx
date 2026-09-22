@@ -16,73 +16,16 @@ export default function WarrantyClaimPage({
     dispatchStatus: 'Pending Dispatch', dispatchStatus: 'Pending Dispatch' });
 
 
+  const availableVehicleModels = useMemo(() => {
+    const models = (vehicles || [])
+      .map((veh) => (veh.model || veh.name || '').trim())
+      .filter(Boolean);
+    return [...new Set(models)];
+  }, [vehicles]);
+
   const [claims, setClaims] = useState(() => {
     const saved = localStorage.getItem('nandhi_warranty_claims');
-    return saved ? JSON.parse(saved) : [
-      {
-        id: 'WC-01',
-        customerName: 'Rajesh Kumar',
-        customerMobile: '9842155670',
-        vehicleModel: 'Honda Activa 6G',
-        vehicleRegNo: 'TN-37-BJ-5120',
-        chassisNo: 'ME4JF911NK001892',
-        engineNo: 'JF91E910245',
-        dateOfSale: '2025-06-15',
-        odometerKm: '12400',
-        defectivePart: 'Starter Motor Assembly',
-        partCode: 'SP-05',
-        defectCategory: 'Electrical',
-        issueDescription: 'Starter motor intermittently fails to crank even with full battery charge.',
-        claimAmount: 2450,
-        oemRefNo: 'HMSI-CLM-8841',
-        status: 'Approved',
-        submissionDate: '2026-08-10',
-        settlementDate: '2026-08-13',
-        notes: 'OEM approved 100% replacement warranty credit.'
-      },
-      {
-        id: 'WC-02',
-        customerName: 'Deepak Sharma',
-        customerMobile: '9443219800',
-        vehicleModel: 'Honda Shine 125',
-        vehicleRegNo: 'TN-45-AS-9821',
-        chassisNo: 'ME4JC822MK009812',
-        engineNo: 'JC82E881239',
-        dateOfSale: '2025-11-20',
-        odometerKm: '8200',
-        defectivePart: 'Rear Shock Absorber RH',
-        partCode: 'SP-08',
-        defectCategory: 'Suspension',
-        issueDescription: 'Oil leakage observed from damper seal.',
-        claimAmount: 1850,
-        oemRefNo: 'HMSI-CLM-9012',
-        status: 'Under OEM Review',
-        submissionDate: '2026-08-12',
-        settlementDate: '',
-        notes: 'Photos and part return dispatched to regional warranty coordinator.'
-      },
-      {
-        id: 'WC-03',
-        customerName: 'Sanjay Kumar',
-        customerMobile: '9843322110',
-        vehicleModel: 'Honda SP 125',
-        vehicleRegNo: 'TN-38-K-4421',
-        chassisNo: 'ME4JC911PL004312',
-        engineNo: 'JC91E672301',
-        dateOfSale: '2026-01-10',
-        odometerKm: '4100',
-        defectivePart: 'Fuel Pump Module',
-        partCode: 'SP-12',
-        defectCategory: 'Engine',
-        issueDescription: 'Pressure drop under acceleration causing engine hesitation.',
-        claimAmount: 4200,
-        oemRefNo: '',
-        status: 'Submitted',
-        submissionDate: '2026-08-14',
-        settlementDate: '',
-        notes: 'Inspection diagnostic report attached.'
-      }
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,7 +39,7 @@ export default function WarrantyClaimPage({
   const [formData, setFormData] = useState({
     customerName: '',
     customerMobile: '',
-    vehicleModel: 'Honda Activa 6G',
+    vehicleModel: availableVehicleModels[0] || '',
     vehicleRegNo: '',
     chassisNo: '',
     engineNo: '',
@@ -195,7 +138,7 @@ export default function WarrantyClaimPage({
     setFormData({
       customerName: '',
       customerMobile: '',
-      vehicleModel: 'Honda Activa 6G',
+      vehicleModel: availableVehicleModels[0] || '',
       vehicleRegNo: '',
       chassisNo: '',
       engineNo: '',
@@ -284,7 +227,7 @@ export default function WarrantyClaimPage({
     setFormData({
       customerName: claim.customerName || '',
       customerMobile: claim.customerMobile || '',
-      vehicleModel: claim.vehicleModel || 'Honda Activa 6G',
+      vehicleModel: claim.vehicleModel || availableVehicleModels[0] || '',
       vehicleRegNo: claim.vehicleRegNo || '',
       chassisNo: claim.chassisNo || '',
       engineNo: claim.engineNo || '',
@@ -923,11 +866,13 @@ export default function WarrantyClaimPage({
                     onChange={(e) => setFormData({ ...formData, vehicleModel: e.target.value })}
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}
                   >
-                    <option value="Honda Activa 6G">Honda Activa 6G</option>
-                    <option value="Honda Shine 125">Honda Shine 125</option>
-                    <option value="Honda SP 125">Honda SP 125</option>
-                    <option value="Honda Dio 125">Honda Dio 125</option>
-                    <option value="Honda Unicorn">Honda Unicorn</option>
+                    {availableVehicleModels.length === 0 ? (
+                      <option value="">No vehicle models available</option>
+                    ) : (
+                      availableVehicleModels.map((model) => (
+                        <option key={model} value={model}>{model}</option>
+                      ))
+                    )}
                   </select>
                 </div>
                 <div>

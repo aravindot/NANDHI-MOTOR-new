@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Bell, Clock, User, Menu } from 'lucide-react';
 
-export default function Header({ activeTab, activeSubTab, onSearchChange, notificationCount = 3, onAlertClick, onToggleSidebar }) {
+export default function Header({ activeTab, activeSubTab, onSearchChange, notificationCount = 3, onAlertClick, onToggleSidebar, onLogout }) {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -98,6 +98,12 @@ export default function Header({ activeTab, activeSubTab, onSearchChange, notifi
             <span className="user-role">Dealership Owner</span>
           </div>
         </div>
+
+        {onLogout && (
+          <button type="button" className="logout-button" onClick={onLogout}>
+            Logout
+          </button>
+        )}
       </div>
     </header>
   );

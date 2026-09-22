@@ -18,7 +18,55 @@ import RedeemPointsPage from './components/pages/RedeemPointsPage';
 import CompanyProfilePage from './components/pages/CompanyProfilePage';
 import { API_BASE_URL } from './config/api';
 
+const APP_CREDENTIALS = {
+  username: '9791537272',
+  password: 'Nandhi@7272'
+};
+
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    try {
+      return localStorage.getItem('nandhi_app_session') === 'true';
+    } catch (error) {
+      return false;
+    }
+  });
+
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [loginError, setLoginError] = useState('');
+
+  useEffect(() => {
+    try {
+      if (isAuthenticated) {
+        localStorage.setItem('nandhi_app_session', 'true');
+      } else {
+        localStorage.removeItem('nandhi_app_session');
+      }
+    } catch (error) {
+      console.warn('Unable to persist login session.', error);
+    }
+  }, [isAuthenticated]);
+
+  const handleLogin = (event) => {
+    event.preventDefault();
+    const username = String(loginForm.username).trim();
+    const password = String(loginForm.password);
+
+    if (username === APP_CREDENTIALS.username && password === APP_CREDENTIALS.password) {
+      setIsAuthenticated(true);
+      setLoginError('');
+      return;
+    }
+
+    setLoginError('Invalid username or password');
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setLoginForm({ username: '', password: '' });
+    setLoginError('');
+  };
+
   // Navigation State
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeSubTab, setActiveSubTab] = useState(null);
@@ -975,6 +1023,54 @@ export default function App() {
     return lowStock + followupsDue;
   }, [spares, leads]);
 
+  if (!isAuthenticated) {
+    return (
+      <div className="login-shell">
+        <div className="login-card">
+          <div className="login-brand">
+            <div className="login-logo">N</div>
+            <div>
+              <h1>NANDHI MOTORS</h1>
+              <p>Dealer Management System</p>
+            </div>
+          </div>
+
+          <form className="login-form" onSubmit={handleLogin}>
+            <div className="login-header">
+              <h2>Sign in</h2>
+            </div>
+
+            <label>
+              <span>Username</span>
+              <input
+                type="text"
+                value={loginForm.username}
+                onChange={(e) => setLoginForm((prev) => ({ ...prev, username: e.target.value }))}
+                placeholder="9791537272"
+                autoComplete="username"
+              />
+            </label>
+
+            <label>
+              <span>Password</span>
+              <input
+                type="password"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))}
+                placeholder="Enter password"
+                autoComplete="current-password"
+              />
+            </label>
+
+            {loginError && <div className="login-error">{loginError}</div>}
+
+            <button type="submit" className="login-button">Login</button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-container">
       {/* 1. Sidebar Navigation */}
@@ -996,6 +1092,7 @@ export default function App() {
           notificationCount={alertCount}
           onAlertClick={() => handleTabChange('management', 'alerts')}
           onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
+          onLogout={handleLogout}
         />
 
         {/* Dynamic Page body */}

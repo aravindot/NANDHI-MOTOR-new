@@ -1052,7 +1052,7 @@ export default function LeadsManagement({
         color: leadFormData.vehicleColor,
         price: leadFormData.price ? Number(leadFormData.price) : 0,
         leadType: leadFormData.leadType,
-        status: leadFormData.status || 'Entered',
+        status: 'Converted',
         followupDate: leadFormData.followupDate,
         reminder: leadFormData.reminder || 'ON',
         reminderTime: leadFormData.reminderTime || '10:00',

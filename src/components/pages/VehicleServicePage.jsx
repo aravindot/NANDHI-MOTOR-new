@@ -984,11 +984,10 @@ export default function VehicleServicePage({
                 return (
                   <div key={idx} style={{ marginBottom: '10px' }}>
                     <div className="form-grid" style={{ gridTemplateColumns: '1.4fr 120px 90px 40px', gap: '10px', alignItems: 'center' }}>
-                      <div className="form-group" style={{ margin: 0 }}>
+                      <div className="form-group" style={{ margin: 0, position: 'relative' }}>
                         <input
                           type="text"
                           className="form-control"
-                          list={`spare-search-options-${idx}`}
                           placeholder="Type spare name..."
                           required
                           value={item.name || ''}
@@ -1026,18 +1025,67 @@ export default function VehicleServicePage({
                             setBillingParts(updated);
                           }}
                         />
-                        <datalist id={`spare-search-options-${idx}`}>
-                          {spares.map(s => {
-                            const pName = s.name || s.partName;
-                            const pPrice = getSpareSellingPrice(s);
-                            const pStock = s.stock ?? s.quantity ?? 0;
-                            return (
-                              <option key={s.id} value={pName}>
-                                {pName} {s.partNo ? `[${s.partNo}]` : ''} - ₹{pPrice} (In Stock: {pStock})
-                              </option>
-                            );
-                          })}
-                        </datalist>
+
+                        {item.name && item.name.trim().length > 0 && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            backgroundColor: '#fff',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            boxShadow: '0 10px 20px rgba(15,23,42,0.08)',
+                            zIndex: 20,
+                            maxHeight: '180px',
+                            overflowY: 'auto',
+                            marginTop: '4px'
+                          }}>
+                            {spares
+                              .filter((s) => {
+                                const pName = (s.name || s.partName || '').toLowerCase();
+                                const search = (item.name || '').toLowerCase().trim();
+                                return search && pName.includes(search);
+                              })
+                              .slice(0, 8)
+                              .map((s) => {
+                                const pName = s.name || s.partName;
+                                const pPrice = getSpareSellingPrice(s);
+                                const pStock = s.stock ?? s.quantity ?? 0;
+                                return (
+                                  <div
+                                    key={s.id}
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => {
+                                      const updated = [...billingParts];
+                                      updated[idx] = {
+                                        ...updated[idx],
+                                        id: s.id,
+                                        name: pName,
+                                        partNo: s.partNo || '',
+                                        price: pPrice,
+                                        stock: pStock,
+                                        qty: updated[idx].qty || 1
+                                      };
+                                      setBillingParts(updated);
+                                    }}
+                                    style={{
+                                      padding: '8px 10px',
+                                      borderBottom: '1px solid #f3f4f6',
+                                      cursor: 'pointer',
+                                      fontSize: '0.78rem',
+                                      color: '#374151'
+                                    }}
+                                  >
+                                    <div style={{ fontWeight: 600 }}>{pName}</div>
+                                    <div style={{ color: '#6b7280', fontSize: '0.7rem' }}>
+                                      {s.partNo ? `[${s.partNo}]` : ''} - ₹{pPrice} (In Stock: {pStock})
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        )}
                       </div>
                       <div className="form-group" style={{ margin: 0 }}>
                         <input

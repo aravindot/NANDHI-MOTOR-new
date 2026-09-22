@@ -216,7 +216,13 @@ export default function App() {
 2. Final delivery is subject to vehicle color and model stock availability.
 3. RTO registration, Road Tax & Insurance charges are subject to statutory revisions by Government authorities.
 4. Full on-road payment is required prior to vehicle invoicing and registration dispatch.
-5. Standard accessories & helmet are supplied per dealership delivery policy.`
+5. Standard accessories & helmet are supplied per dealership delivery policy.`,
+      gstSettings: {
+        laborGstEnabled: true,
+        sparesGstEnabled: true,
+        laborRate: 18,
+        sparesRate: 18
+      }
     };
   };
 

@@ -68,8 +68,11 @@ export default function VehicleServicePage({
   const [selectedServiceWork, setSelectedServiceWork] = useState('General Service');
   const [laborItems, setLaborItems] = useState([{ desc: 'General Service Labor', amount: 350 }]);
   const [billingParts, setBillingParts] = useState([]);
-  const [taxRate, setTaxRate] = useState(5); // 5% GST standard for EV services
   const [discount, setDiscount] = useState(0);
+
+  const gstSettings = companyProfile?.gstSettings || { laborGstEnabled: true, sparesGstEnabled: true, laborRate: 18, sparesRate: 18 };
+  const laborTaxRate = gstSettings.laborGstEnabled ? Number(gstSettings.laborRate || 0) : 0;
+  const sparesTaxRate = gstSettings.sparesGstEnabled ? Number(gstSettings.sparesRate || 0) : 0;
 
   // Status progression cycle
   const STATUS_FLOW = ['Pending', 'In Progress', 'Ready', 'Delivered'];
@@ -243,13 +246,15 @@ export default function VehicleServicePage({
   const getBillingTotals = () => {
     const laborTotal = laborItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const partsTotal = billingParts.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 0)), 0);
+    const laborGstAmount = Math.round(laborTotal * (laborTaxRate / 100));
+    const sparesGstAmount = Math.round(partsTotal * (sparesTaxRate / 100));
     const subtotal = laborTotal + partsTotal;
-    const gstAmount = Math.round(subtotal * (taxRate / 100));
+    const gstAmount = laborGstAmount + sparesGstAmount;
     const rawTotal = subtotal + gstAmount - Number(discount || 0);
     const grandTotal = Math.max(0, Math.round(rawTotal));
     const roundOff = grandTotal - rawTotal;
 
-    return { laborTotal, partsTotal, subtotal, gstAmount, roundOff, grandTotal };
+    return { laborTotal, partsTotal, subtotal, laborGstAmount, sparesGstAmount, gstAmount, roundOff, grandTotal };
   };
 
   const addLaborRow = () => {
@@ -306,6 +311,11 @@ export default function VehicleServicePage({
       parts: [...billingParts],
       subtotal: totals.subtotal,
       gst: totals.gstAmount,
+      gstAmount: totals.gstAmount,
+      laborTaxRate,
+      sparesTaxRate,
+      laborGstAmount: totals.laborGstAmount,
+      sparesGstAmount: totals.sparesGstAmount,
       discount: Number(discount),
       roundOff: Number(totals.roundOff.toFixed(2)),
       grandTotal: totals.grandTotal,
@@ -1007,7 +1017,7 @@ export default function VehicleServicePage({
                           }}
                         />
 
-                        {item.name && item.name.trim().length > 0 && (
+                        {item.name && item.name.trim().length > 0 && !item.id && (
                           <div style={{
                             position: 'absolute',
                             top: '100%',
@@ -1137,17 +1147,22 @@ export default function VehicleServicePage({
               </h4>
               <div className="form-grid">
                 <div className="form-group">
-                  <label className="form-label">GST Tax rate (%)</label>
-                  <select
+                  <label className="form-label">Labor GST</label>
+                  <input
+                    type="text"
                     className="form-control"
-                    value={taxRate}
-                    onChange={(e) => setTaxRate(Number(e.target.value))}
-                  >
-                    <option value="5">5% EV Service Tax</option>
-                    <option value="12">12% Parts Standard Tax</option>
-                    <option value="18">18% Accessories / Labor Tax</option>
-                    <option value="0">0% Exempted</option>
-                  </select>
+                    value={gstSettings.laborGstEnabled ? `${laborTaxRate}%` : 'OFF'}
+                    readOnly
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Spare GST</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={gstSettings.sparesGstEnabled ? `${sparesTaxRate}%` : 'OFF'}
+                    readOnly
+                  />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Discount Amount (₹)</label>
@@ -1188,8 +1203,16 @@ export default function VehicleServicePage({
                     <td style={{ padding: '5px 0', textAlign: 'right', fontWeight: 600 }}>₹{getBillingTotals().subtotal.toLocaleString('en-IN')}</td>
                   </tr>
                   <tr>
-                    <td style={{ padding: '5px 0', color: '#6b7280' }}>GST ({taxRate}%):</td>
-                    <td style={{ padding: '5px 0', textAlign: 'right', fontWeight: 600 }}>+ ₹{getBillingTotals().gstAmount.toLocaleString('en-IN')}</td>
+                    <td style={{ padding: '5px 0', color: '#6b7280' }}>GST on Labor ({laborTaxRate}%):</td>
+                    <td style={{ padding: '5px 0', textAlign: 'right', fontWeight: 600 }}>+ ₹{getBillingTotals().laborGstAmount.toLocaleString('en-IN')}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '5px 0', color: '#6b7280' }}>GST on Spares ({sparesTaxRate}%):</td>
+                    <td style={{ padding: '5px 0', textAlign: 'right', fontWeight: 600 }}>+ ₹{getBillingTotals().sparesGstAmount.toLocaleString('en-IN')}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '5px 0', color: '#6b7280' }}>Total GST:</td>
+                    <td style={{ padding: '5px 0', textAlign: 'right', fontWeight: 600 }}>₹{getBillingTotals().gstAmount.toLocaleString('en-IN')}</td>
                   </tr>
                   {discount > 0 && (
                     <tr>

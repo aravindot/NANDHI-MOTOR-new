@@ -32,6 +32,13 @@ export default function SettingsPage({
   companyProfile,
   setCompanyProfile
 }) {
+  const defaultGstSettings = {
+    laborGstEnabled: true,
+    sparesGstEnabled: true,
+    laborRate: 18,
+    sparesRate: 18
+  };
+
   const [quotationTerms, setQuotationTerms] = useState(() => {
     return companyProfile?.quotationTerms || DEFAULT_QUOTATION_TERMS;
   });
@@ -41,6 +48,9 @@ export default function SettingsPage({
   const [laborTypes, setLaborTypes] = useState(() => {
     return companyProfile?.serviceLaborTypes || DEFAULT_SERVICE_LABOR_TYPES;
   });
+  const [gstSettings, setGstSettings] = useState(() => {
+    return companyProfile?.gstSettings || defaultGstSettings;
+  });
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [activeModal, setActiveModal] = useState(null);
 
@@ -48,6 +58,7 @@ export default function SettingsPage({
     if (companyProfile?.quotationTerms) setQuotationTerms(companyProfile.quotationTerms);
     if (companyProfile?.invoiceTerms) setInvoiceTerms(companyProfile.invoiceTerms);
     if (companyProfile?.serviceLaborTypes) setLaborTypes(companyProfile.serviceLaborTypes);
+    if (companyProfile?.gstSettings) setGstSettings(companyProfile.gstSettings);
   }, [companyProfile]);
 
   const handleSaveTerms = (e) => {
@@ -57,7 +68,11 @@ export default function SettingsPage({
         ...(companyProfile || {}),
         quotationTerms: quotationTerms.trim(),
         invoiceTerms: invoiceTerms.trim(),
-        serviceLaborTypes: laborTypes
+        serviceLaborTypes: laborTypes,
+        gstSettings: {
+          ...defaultGstSettings,
+          ...gstSettings
+        }
       };
       setCompanyProfile(updatedProfile);
       setSaveSuccess(true);
@@ -66,16 +81,18 @@ export default function SettingsPage({
   };
 
   const handleResetTerms = () => {
-    if (confirm('Reset quotation, invoice terms, and labor types back to the system default templates?')) {
+    if (confirm('Reset quotation, invoice terms, labor types, and GST settings back to the system defaults?')) {
       setQuotationTerms(DEFAULT_QUOTATION_TERMS);
       setInvoiceTerms(DEFAULT_INVOICE_TERMS);
       setLaborTypes(DEFAULT_SERVICE_LABOR_TYPES);
+      setGstSettings(defaultGstSettings);
       if (setCompanyProfile) {
         setCompanyProfile({
           ...(companyProfile || {}),
           quotationTerms: DEFAULT_QUOTATION_TERMS,
           invoiceTerms: DEFAULT_INVOICE_TERMS,
-          serviceLaborTypes: DEFAULT_SERVICE_LABOR_TYPES
+          serviceLaborTypes: DEFAULT_SERVICE_LABOR_TYPES,
+          gstSettings: defaultGstSettings
         });
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
@@ -165,6 +182,24 @@ export default function SettingsPage({
           </div>
         </div>
 
+        <div 
+          className="card" 
+          style={{ cursor: 'pointer', transition: 'transform 0.2s', margin: 0 }} 
+          onClick={() => setActiveModal('gst')}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
+          <div className="card-body" style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ padding: '12px', backgroundColor: '#fef3c7', borderRadius: '12px', color: '#b45309' }}>
+              <ShieldAlert size={24} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 4px 0', color: '#111827' }}>GST Controls</h3>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#6b7280' }}>Enable or disable GST for service labour and spares.</p>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* MODALS */}
@@ -205,6 +240,7 @@ export default function SettingsPage({
                 {activeModal === 'terms' && <><FileText size={20} color="#059669" /> Document Terms & Conditions</>}
                 {activeModal === 'layout' && <><Settings size={20} color="#4b5563" /> Feature Preview & Layouts</>}
                 {activeModal === 'labor' && <><Wrench size={20} color="#2563eb" /> Service Labour & Work Types</>}
+                {activeModal === 'gst' && <><ShieldAlert size={20} color="#b45309" /> GST Controls</>}
               </h3>
               <button 
                 onClick={() => setActiveModal(null)} 
@@ -407,6 +443,75 @@ export default function SettingsPage({
                       )}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {activeModal === 'gst' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '12px', backgroundColor: '#f9fafb' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <strong style={{ color: '#111827' }}>Labor GST</strong>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => setGstSettings(prev => ({ ...prev, laborGstEnabled: !prev.laborGstEnabled }))}
+                          style={{
+                            border: 'none',
+                            background: gstSettings.laborGstEnabled ? '#dcfce7' : '#e5e7eb',
+                            color: gstSettings.laborGstEnabled ? '#166534' : '#374151',
+                            padding: '6px 12px',
+                            borderRadius: '999px',
+                            fontWeight: 700
+                          }}
+                        >
+                          {gstSettings.laborGstEnabled ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>GST Rate (%)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        className="form-control"
+                        value={gstSettings.laborRate}
+                        onChange={(e) => setGstSettings(prev => ({ ...prev, laborRate: Number(e.target.value) || 0 }))}
+                        disabled={!gstSettings.laborGstEnabled}
+                      />
+                    </div>
+
+                    <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '12px', backgroundColor: '#f9fafb' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <strong style={{ color: '#111827' }}>Spare GST</strong>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => setGstSettings(prev => ({ ...prev, sparesGstEnabled: !prev.sparesGstEnabled }))}
+                          style={{
+                            border: 'none',
+                            background: gstSettings.sparesGstEnabled ? '#dcfce7' : '#e5e7eb',
+                            color: gstSettings.sparesGstEnabled ? '#166534' : '#374151',
+                            padding: '6px 12px',
+                            borderRadius: '999px',
+                            fontWeight: 700
+                          }}
+                        >
+                          {gstSettings.sparesGstEnabled ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>GST Rate (%)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        className="form-control"
+                        value={gstSettings.sparesRate}
+                        onChange={(e) => setGstSettings(prev => ({ ...prev, sparesRate: Number(e.target.value) || 0 }))}
+                        disabled={!gstSettings.sparesGstEnabled}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ padding: '12px 14px', backgroundColor: '#fff7ed', borderRadius: '8px', border: '1px solid #fed7aa', color: '#9a5b00', fontSize: '0.82rem' }}>
+                    Default GST for both labour and spares is set to 18%. You can turn each tax ON or OFF from here and keep the invoice system controlled centrally from settings.
+                  </div>
                 </div>
               )}
 

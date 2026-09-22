@@ -268,6 +268,18 @@ export default function VehicleServicePage({
     setBillingParts(billingParts.filter((_, i) => i !== idx));
   };
 
+  const getSpareSellingPrice = (spare = {}) => {
+    return Number(
+      spare.mrp ??
+      spare.unitPrice ??
+      spare.priceWithGst ??
+      spare.sellingPrice ??
+      spare.price ??
+      spare.dealerPrice ??
+      0
+    );
+  };
+
   const handleBillSubmit = (e) => {
     e.preventDefault();
     if (!billingJobSheetId) {
@@ -981,7 +993,7 @@ export default function VehicleServicePage({
                             const spare = spares.find(s => s.id === e.target.value);
                             if (spare) {
                               const updated = [...billingParts];
-                              const partPrice = spare.unitPrice || spare.priceWithGst || spare.mrp || spare.sellingPrice || spare.price || 0;
+                              const partPrice = getSpareSellingPrice(spare);
                               const partStock = spare.stock ?? spare.quantity ?? 0;
                               updated[idx] = {
                                 id: spare.id,
@@ -998,7 +1010,7 @@ export default function VehicleServicePage({
                           <option value="">-- Choose Spare from Catalog --</option>
                           {spares.map(s => {
                             const pName = s.name || s.partName;
-                            const pPrice = s.unitPrice || s.priceWithGst || s.mrp || s.sellingPrice || s.price || 0;
+                            const pPrice = getSpareSellingPrice(s);
                             const pStock = s.stock ?? s.quantity ?? 0;
                             return (
                               <option key={s.id} value={s.id}>

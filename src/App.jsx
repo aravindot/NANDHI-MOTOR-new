@@ -20,7 +20,7 @@ import { API_BASE_URL } from './config/api';
 
 const APP_CREDENTIALS = {
   username: '9791537272',
-  password: 'Nandhi@7272'
+  password: 'Nandhimotors@5233'
 };
 
 const readLocalStorageJson = (key, fallback) => {

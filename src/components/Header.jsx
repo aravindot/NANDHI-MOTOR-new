@@ -75,11 +75,12 @@ export default function Header({ activeTab, activeSubTab, onSearchChange, notifi
         </div>
 
         {/* Live Clock */}
-        <div className="header-clock">
+        <div className="header-clock" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Clock size={16} style={{ color: '#059669' }} />
-          <span>
-            {formatDate(time)} | {formatTime(time)}
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.2 }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#111827' }}>{formatDate(time)}</span>
+            <span style={{ fontSize: '0.7rem', color: '#4b5563' }}>{formatTime(time)}</span>
+          </div>
         </div>
 
         {/* Notification Alert Trigger */}

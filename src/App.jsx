@@ -23,6 +23,16 @@ const APP_CREDENTIALS = {
   password: 'Nandhi@7272'
 };
 
+const readLocalStorageJson = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw || raw === 'null') return fallback;
+    return JSON.parse(raw);
+  } catch (error) {
+    return fallback;
+  }
+};
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     try {
@@ -72,41 +82,13 @@ export default function App() {
   const [activeSubTab, setActiveSubTab] = useState(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  // Shared Leads Database with localStorage Persistence
-  const [leads, setLeads] = useState(() => {
-    const saved = localStorage.getItem('nandhi_app_leads');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Shared Customers Database with localStorage Persistence
-  const [customers, setCustomers] = useState(() => {
-    const saved = localStorage.getItem('nandhi_app_customers');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Shared Spares Database with localStorage Persistence
-  const [spares, setSpares] = useState(() => {
-    const saved = localStorage.getItem('nandhi_app_spares');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Shared Invoices Database with localStorage Persistence
-  const [invoices, setInvoices] = useState(() => {
-    const saved = localStorage.getItem('nandhi_app_invoices');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Shared Quotations Database with localStorage Persistence
-  const [quotations, setQuotations] = useState(() => {
-    const saved = localStorage.getItem('nandhi_app_quotations');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Shared Vehicles Directory with localStorage Persistence
-  const [vehicles, setVehicles] = useState(() => {
-    const saved = localStorage.getItem('nandhi_app_vehicles');
-    return saved ? JSON.parse(saved) : [];
-  });
+  // Shared data state. The backend is the source of truth; localStorage is used only as fallback when the server is unavailable.
+  const [leads, setLeads] = useState(() => readLocalStorageJson('nandhi_app_leads', []));
+  const [customers, setCustomers] = useState(() => readLocalStorageJson('nandhi_app_customers', []));
+  const [spares, setSpares] = useState(() => readLocalStorageJson('nandhi_app_spares', []));
+  const [invoices, setInvoices] = useState(() => readLocalStorageJson('nandhi_app_invoices', []));
+  const [quotations, setQuotations] = useState(() => readLocalStorageJson('nandhi_app_quotations', []));
+  const [vehicles, setVehicles] = useState(() => readLocalStorageJson('nandhi_app_vehicles', []));
 
   useEffect(() => {
     localStorage.setItem('nandhi_app_leads', JSON.stringify(leads));
@@ -132,17 +114,8 @@ export default function App() {
     localStorage.setItem('nandhi_app_vehicles', JSON.stringify(vehicles));
   }, [vehicles]);
 
-  // Shared Job Sheets Database
-  const [jobSheets, setJobSheets] = useState(() => {
-    const saved = localStorage.getItem('nandhi_app_jobsheets');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Shared Service Bills Database
-  const [serviceBills, setServiceBills] = useState(() => {
-    const saved = localStorage.getItem('nandhi_app_service_bills');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [jobSheets, setJobSheets] = useState(() => readLocalStorageJson('nandhi_app_jobsheets', []));
+  const [serviceBills, setServiceBills] = useState(() => readLocalStorageJson('nandhi_app_service_bills', []));
 
   useEffect(() => {
     localStorage.setItem('nandhi_app_jobsheets', JSON.stringify(jobSheets));
@@ -152,17 +125,8 @@ export default function App() {
     localStorage.setItem('nandhi_app_service_bills', JSON.stringify(serviceBills));
   }, [serviceBills]);
 
-  // Shared Daily Expenses Database
-  const [dailyExpenses, setDailyExpenses] = useState(() => {
-    const saved = localStorage.getItem('nandhi_app_daily_expenses');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Shared Purchase Invoices Database
-  const [purchaseInvoices, setPurchaseInvoices] = useState(() => {
-    const saved = localStorage.getItem('nandhi_app_purchase_invoices');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [dailyExpenses, setDailyExpenses] = useState(() => readLocalStorageJson('nandhi_app_daily_expenses', []));
+  const [purchaseInvoices, setPurchaseInvoices] = useState(() => readLocalStorageJson('nandhi_app_purchase_invoices', []));
 
   useEffect(() => {
     localStorage.setItem('nandhi_app_daily_expenses', JSON.stringify(dailyExpenses));
@@ -238,138 +202,74 @@ export default function App() {
     localStorage.setItem('nandhi_app_show_previews', JSON.stringify(showPreviews));
   }, [showPreviews]);
 
-  // Fetch initial data from backend on mount (MERGE WITHOUT OVERWRITING USER DATA)
+  // Fetch initial data from backend on mount and only fall back to local storage if the backend is unavailable.
   useEffect(() => {
     const initData = async () => {
-      try {
-        const vRes = await fetch(`${API_BASE_URL}/api/vehicles`);
-        if (vRes.ok) {
-          const vData = await vRes.json();
-          if (Array.isArray(vData) && vData.length > 0) setVehicles(vData);
-        }
-      } catch (e) {
-        console.warn('Fallback to local storage for vehicles.');
-      }
+      const loadFallbacks = () => {
+        setVehicles(readLocalStorageJson('nandhi_app_vehicles', []));
+        setLeads(readLocalStorageJson('nandhi_app_leads', []));
+        setCustomers(readLocalStorageJson('nandhi_app_customers', []));
+        setSpares(readLocalStorageJson('nandhi_app_spares', []));
+        setInvoices(readLocalStorageJson('nandhi_app_invoices', []));
+        setQuotations(readLocalStorageJson('nandhi_app_quotations', []));
+        setJobSheets(readLocalStorageJson('nandhi_app_jobsheets', []));
+        setServiceBills(readLocalStorageJson('nandhi_app_service_bills', []));
+        setDailyExpenses(readLocalStorageJson('nandhi_app_daily_expenses', []));
+        setPurchaseInvoices(readLocalStorageJson('nandhi_app_purchase_invoices', []));
 
-      try {
-        const lRes = await fetch(`${API_BASE_URL}/api/leads`);
-        if (lRes.ok) {
-          const lData = await lRes.json();
-          if (Array.isArray(lData) && lData.length > 0) setLeads(lData);
-        }
-      } catch (e) {
-        console.warn('Fallback to local storage for leads.');
-      }
-
-      try {
-        const cRes = await fetch(`${API_BASE_URL}/api/customers`);
-        if (cRes.ok) {
-          const cData = await cRes.json();
-          if (Array.isArray(cData) && cData.length > 0) setCustomers(cData);
-        }
-      } catch (e) {
-        console.warn('Fallback to local storage for customers.');
-      }
-
-      try {
-        const sRes = await fetch(`${API_BASE_URL}/api/spares`);
-        if (sRes.ok) {
-          const sData = await sRes.json();
-          if (Array.isArray(sData) && sData.length > 0) setSpares(sData);
-        }
-      } catch (e) {
-        console.warn('Fallback to local storage for spares.');
-      }
-
-      try {
-        const invRes = await fetch(`${API_BASE_URL}/api/invoices`);
-        if (invRes.ok) {
-          const invData = await invRes.json();
-          if (Array.isArray(invData) && invData.length > 0) setInvoices(invData);
-        }
-      } catch (e) {
-        console.warn('Fallback to local storage for invoices.');
-      }
-
-      try {
-        const qRes = await fetch(`${API_BASE_URL}/api/quotations`);
-        if (qRes.ok) {
-          const qData = await qRes.json();
-          if (Array.isArray(qData) && qData.length > 0) setQuotations(qData);
-        }
-      } catch (e) {
-        console.warn('Fallback to local storage for quotations.');
-      }
-
-      try {
-        const jsRes = await fetch(`${API_BASE_URL}/api/jobsheets`);
-        if (jsRes.ok) {
-          const jsData = await jsRes.json();
-          if (Array.isArray(jsData) && jsData.length > 0) setJobSheets(jsData);
-        }
-      } catch (e) {
-        console.warn('Fallback to local storage for job sheets.');
-      }
-
-      try {
-        const sbRes = await fetch(`${API_BASE_URL}/api/service-bills`);
-        if (sbRes.ok) {
-          const sbData = await sbRes.json();
-          if (Array.isArray(sbData) && sbData.length > 0) setServiceBills(sbData);
-        }
-      } catch (e) {
-        console.warn('Fallback to local storage for service bills.');
-      }
-
-      try {
-        const expRes = await fetch(`${API_BASE_URL}/api/expenses`);
-        if (expRes.ok) {
-          const expData = await expRes.json();
-          if (Array.isArray(expData) && expData.length > 0) setDailyExpenses(expData);
-        }
-      } catch (e) {
-        console.warn('Fallback to local storage for expenses.');
-      }
-
-      try {
-        const purRes = await fetch(`${API_BASE_URL}/api/purchases`);
-        if (purRes.ok) {
-          const purData = await purRes.json();
-          if (Array.isArray(purData) && purData.length > 0) setPurchaseInvoices(purData);
-        }
-      } catch (e) {
-        console.warn('Fallback to local storage for purchases.');
-      }
-
-      try {
         const savedPrimary = localStorage.getItem('nandhi_app_company_profile');
         const savedLegacy = localStorage.getItem('nandhi_company_profile');
         const savedProfile = savedPrimary || savedLegacy;
-        const hasLocalProfile = !!savedProfile && savedProfile !== 'null';
-
-        const profRes = await fetch(`${API_BASE_URL}/api/company-profile`);
-        if (profRes.ok) {
-          const profData = await profRes.json();
-          if (profData && profData.name) {
-            if (!hasLocalProfile) {
-              setCompanyProfile(profData);
-            } else {
-              let parsedLocal = null;
-              try {
-                parsedLocal = JSON.parse(savedProfile);
-              } catch (e) {
-                parsedLocal = null;
-              }
-              if (parsedLocal && parsedLocal.name) {
-                setCompanyProfile(parsedLocal);
-              } else {
-                setCompanyProfile(profData);
-              }
-            }
+        if (savedProfile) {
+          try {
+            setCompanyProfile(JSON.parse(savedProfile));
+          } catch (e) {
+            console.warn('Unable to read saved company profile from localStorage.', e);
           }
         }
+      };
+
+      try {
+        const [vRes, lRes, cRes, sRes, invRes, qRes, jsRes, sbRes, expRes, purRes, profRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/vehicles`),
+          fetch(`${API_BASE_URL}/api/leads`),
+          fetch(`${API_BASE_URL}/api/customers`),
+          fetch(`${API_BASE_URL}/api/spares`),
+          fetch(`${API_BASE_URL}/api/invoices`),
+          fetch(`${API_BASE_URL}/api/quotations`),
+          fetch(`${API_BASE_URL}/api/jobsheets`),
+          fetch(`${API_BASE_URL}/api/service-bills`),
+          fetch(`${API_BASE_URL}/api/expenses`),
+          fetch(`${API_BASE_URL}/api/purchases`),
+          fetch(`${API_BASE_URL}/api/company-profile`)
+        ]);
+
+        const vData = vRes.ok ? await vRes.json() : [];
+        const lData = lRes.ok ? await lRes.json() : [];
+        const cData = cRes.ok ? await cRes.json() : [];
+        const sData = sRes.ok ? await sRes.json() : [];
+        const invData = invRes.ok ? await invRes.json() : [];
+        const qData = qRes.ok ? await qRes.json() : [];
+        const jsData = jsRes.ok ? await jsRes.json() : [];
+        const sbData = sbRes.ok ? await sbRes.json() : [];
+        const expData = expRes.ok ? await expRes.json() : [];
+        const purData = purRes.ok ? await purRes.json() : [];
+        const profData = profRes.ok ? await profRes.json() : null;
+
+        if (Array.isArray(vData)) setVehicles(vData);
+        if (Array.isArray(lData)) setLeads(lData);
+        if (Array.isArray(cData)) setCustomers(cData);
+        if (Array.isArray(sData)) setSpares(sData);
+        if (Array.isArray(invData)) setInvoices(invData);
+        if (Array.isArray(qData)) setQuotations(qData);
+        if (Array.isArray(jsData)) setJobSheets(jsData);
+        if (Array.isArray(sbData)) setServiceBills(sbData);
+        if (Array.isArray(expData)) setDailyExpenses(expData);
+        if (Array.isArray(purData)) setPurchaseInvoices(purData);
+        if (profData && profData.name) setCompanyProfile(profData);
       } catch (e) {
-        console.warn('Fallback to local storage for company profile.');
+        console.warn('Backend unavailable; using local storage fallback.', e);
+        loadFallbacks();
       }
     };
     initData();

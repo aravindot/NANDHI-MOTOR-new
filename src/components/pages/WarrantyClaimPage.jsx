@@ -925,12 +925,12 @@ export default function WarrantyClaimPage({
                     onChange={(e) => setFormData({ ...formData, defectCategory: e.target.value })}
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}
                   >
+                    <option value="Motor">Motor</option>
+                    <option value="Battery">Battery</option>
+                    <option value="Controller">Controller</option>
+                    <option value="Cluster">Cluster</option>
+                    <option value="DC to DC">DC to DC</option>
                     <option value="Electrical">Electrical</option>
-                    <option value="Engine">Engine</option>
-                    <option value="Suspension">Suspension</option>
-                    <option value="Braking">Braking</option>
-                    <option value="Transmission">Transmission</option>
-                    <option value="Paint / Body">Paint / Body</option>
                   </select>
                 </div>
               </div>

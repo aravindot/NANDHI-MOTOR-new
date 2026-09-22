@@ -985,40 +985,59 @@ export default function VehicleServicePage({
                   <div key={idx} style={{ marginBottom: '10px' }}>
                     <div className="form-grid" style={{ gridTemplateColumns: '1.4fr 120px 90px 40px', gap: '10px', alignItems: 'center' }}>
                       <div className="form-group" style={{ margin: 0 }}>
-                        <select
+                        <input
+                          type="text"
                           className="form-control"
+                          list={`spare-search-options-${idx}`}
+                          placeholder="Type spare name..."
                           required
-                          value={item.id}
+                          value={item.name || ''}
                           onChange={(e) => {
-                            const spare = spares.find(s => s.id === e.target.value);
-                            if (spare) {
-                              const updated = [...billingParts];
-                              const partPrice = getSpareSellingPrice(spare);
-                              const partStock = spare.stock ?? spare.quantity ?? 0;
+                            const typed = e.target.value;
+                            const updated = [...billingParts];
+                            const matchingSpare = spares.find(s => {
+                              const partName = (s.name || s.partName || '').toLowerCase();
+                              return partName === typed.trim().toLowerCase() || partName.includes(typed.trim().toLowerCase());
+                            });
+
+                            if (matchingSpare) {
+                              const partPrice = getSpareSellingPrice(matchingSpare);
+                              const partStock = matchingSpare.stock ?? matchingSpare.quantity ?? 0;
                               updated[idx] = {
-                                id: spare.id,
-                                name: spare.name || spare.partName,
-                                partNo: spare.partNo || '',
+                                ...updated[idx],
+                                id: matchingSpare.id,
+                                name: matchingSpare.name || matchingSpare.partName,
+                                partNo: matchingSpare.partNo || '',
                                 price: partPrice,
                                 stock: partStock,
-                                qty: item.qty || 1
+                                qty: updated[idx].qty || 1
                               };
-                              setBillingParts(updated);
+                            } else {
+                              updated[idx] = {
+                                ...updated[idx],
+                                id: '',
+                                name: typed,
+                                partNo: '',
+                                price: 0,
+                                stock: 0,
+                                qty: updated[idx].qty || 1
+                              };
                             }
+                            setBillingParts(updated);
                           }}
-                        >
-                          <option value="">-- Choose Spare from Catalog --</option>
+                        />
+                        <datalist id={`spare-search-options-${idx}`}>
                           {spares.map(s => {
                             const pName = s.name || s.partName;
                             const pPrice = getSpareSellingPrice(s);
                             const pStock = s.stock ?? s.quantity ?? 0;
                             return (
-                              <option key={s.id} value={s.id}>
+                              <option key={s.id} value={pName}>
                                 {pName} {s.partNo ? `[${s.partNo}]` : ''} - ₹{pPrice} (In Stock: {pStock})
                               </option>
                             );
                           })}
-                        </select>
+                        </datalist>
                       </div>
                       <div className="form-group" style={{ margin: 0 }}>
                         <input

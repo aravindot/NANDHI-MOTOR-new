@@ -994,34 +994,15 @@ export default function VehicleServicePage({
                           onChange={(e) => {
                             const typed = e.target.value;
                             const updated = [...billingParts];
-                            const matchingSpare = spares.find(s => {
-                              const partName = (s.name || s.partName || '').toLowerCase();
-                              return partName === typed.trim().toLowerCase() || partName.includes(typed.trim().toLowerCase());
-                            });
-
-                            if (matchingSpare) {
-                              const partPrice = getSpareSellingPrice(matchingSpare);
-                              const partStock = matchingSpare.stock ?? matchingSpare.quantity ?? 0;
-                              updated[idx] = {
-                                ...updated[idx],
-                                id: matchingSpare.id,
-                                name: matchingSpare.name || matchingSpare.partName,
-                                partNo: matchingSpare.partNo || '',
-                                price: partPrice,
-                                stock: partStock,
-                                qty: updated[idx].qty || 1
-                              };
-                            } else {
-                              updated[idx] = {
-                                ...updated[idx],
-                                id: '',
-                                name: typed,
-                                partNo: '',
-                                price: 0,
-                                stock: 0,
-                                qty: updated[idx].qty || 1
-                              };
-                            }
+                            updated[idx] = {
+                              ...updated[idx],
+                              id: '',
+                              name: typed,
+                              partNo: '',
+                              price: 0,
+                              stock: 0,
+                              qty: updated[idx].qty || 1
+                            };
                             setBillingParts(updated);
                           }}
                         />

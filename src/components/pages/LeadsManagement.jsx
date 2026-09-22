@@ -2260,6 +2260,34 @@ export default function LeadsManagement({
                         >
                           <RotateCcw size={15} />
                         </button>
+
+                        {/* 4. Delete Booking Icon */}
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '6px',
+                            border: '1px solid #fecaca',
+                            backgroundColor: '#fef2f2',
+                            color: '#dc2626'
+                          }}
+                          onClick={async () => {
+                            if (window.confirm(`Are you sure you want to delete Booking #${b.id}?`)) {
+                              await deleteBooking(b.id);
+                              setBookingSuccessMsg(`Booking #${b.id} deleted successfully.`);
+                              setTimeout(() => setBookingSuccessMsg(''), 4000);
+                            }
+                          }}
+                          title="Delete Booking"
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
                     </div>
                   ))

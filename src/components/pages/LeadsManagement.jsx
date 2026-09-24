@@ -409,6 +409,9 @@ export default function LeadsManagement({
     setEditingInvoiceId(null);
     setActiveFormTab(null);
     setInvoiceSuccessMsg(`Tax Invoice #${invoiceNo} saved successfully!`);
+    if (typeof window !== 'undefined' && window.showAppToast) {
+      window.showAppToast(`Tax Invoice #${invoiceNo} saved successfully.`);
+    }
     setTimeout(() => setInvoiceSuccessMsg(''), 4000);
   };
 
@@ -1060,6 +1063,9 @@ export default function LeadsManagement({
       }
       setEditingLead(null);
       setLeadSuccessMsg(`Lead ${editingLead.id} updated successfully!`);
+      if (typeof window !== 'undefined' && window.showAppToast) {
+        window.showAppToast(`Lead ${editingLead.id} saved successfully.`);
+      }
       setTimeout(() => setLeadSuccessMsg(''), 4000);
     } else {
       // Robust unique ID generation
@@ -1117,6 +1123,9 @@ export default function LeadsManagement({
       });
 
       setLeadSuccessMsg(`New Sale Lead #${newLeadId} added successfully for ${newLeadItem.name}!`);
+      if (typeof window !== 'undefined' && window.showAppToast) {
+        window.showAppToast(`Lead #${newLeadId} saved successfully.`);
+      }
       setTimeout(() => setLeadSuccessMsg(''), 4000);
     }
 
@@ -1216,6 +1225,9 @@ export default function LeadsManagement({
     setEditingQuoteId(null);
     setActiveFormTab(null);
     setQuoteSuccessMsg(`Quotation #${quoteId} saved successfully!`);
+    if (typeof window !== 'undefined' && window.showAppToast) {
+      window.showAppToast(`Quotation #${quoteId} saved successfully.`);
+    }
     setTimeout(() => setQuoteSuccessMsg(''), 4000);
   };
 
@@ -2773,9 +2785,9 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      
                       style={{ textTransform: 'uppercase' }}
-                      maxLength={15} value={invoiceFormData.customerGst}
+                      maxLength={15}
+                      value={invoiceFormData.customerGst}
                       onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerGst: e.target.value.toUpperCase() })}
                     />
                   </div>
@@ -2847,7 +2859,6 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      
                       style={{ textTransform: 'uppercase' }}
                       value={invoiceFormData.vinNumber}
                       onChange={(e) => setInvoiceFormData({ ...invoiceFormData, vinNumber: e.target.value.toUpperCase() })}
@@ -2858,7 +2869,6 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      
                       style={{ textTransform: 'uppercase' }}
                       value={invoiceFormData.batteryNumber}
                       onChange={(e) => setInvoiceFormData({ ...invoiceFormData, batteryNumber: e.target.value.toUpperCase() })}
@@ -2871,7 +2881,6 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      
                       style={{ textTransform: 'uppercase' }}
                       value={invoiceFormData.chargerNumber}
                       onChange={(e) => setInvoiceFormData({ ...invoiceFormData, chargerNumber: e.target.value.toUpperCase() })}
@@ -2882,7 +2891,6 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      
                       style={{ textTransform: 'uppercase' }}
                       value={invoiceFormData.controllerNumber}
                       onChange={(e) => setInvoiceFormData({ ...invoiceFormData, controllerNumber: e.target.value.toUpperCase() })}
@@ -2904,7 +2912,6 @@ export default function LeadsManagement({
                   <input
                     type="text"
                     className="form-control"
-                    
                     value={invoiceFormData.warrantyDetails}
                     onChange={(e) => setInvoiceFormData({ ...invoiceFormData, warrantyDetails: e.target.value })}
                   />
@@ -3439,7 +3446,6 @@ export default function LeadsManagement({
                   <input
                     type="text"
                     className="form-control"
-                    
                     required
                     value={leadFormData.name}
                     onChange={(e) => setLeadFormData({ ...leadFormData, name: e.target.value })}
@@ -3454,7 +3460,6 @@ export default function LeadsManagement({
                       inputMode="numeric"
                       maxLength={10}
                       className="form-control"
-                      
                       required
                       pattern="[0-9]{10}"
                       value={leadFormData.mobile}
@@ -3466,7 +3471,6 @@ export default function LeadsManagement({
                     <input
                       type="email"
                       className="form-control"
-                      
                       value={leadFormData.email}
                       onChange={(e) => setLeadFormData({ ...leadFormData, email: e.target.value })}
                     />
@@ -3505,7 +3509,6 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      
                       value={leadFormData.address}
                       onChange={(e) => setLeadFormData({ ...leadFormData, address: e.target.value })}
                     />
@@ -3555,7 +3558,6 @@ export default function LeadsManagement({
                     inputMode="numeric"
                     className="form-control"
                     required
-                    
                     value={leadFormData.price}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -3681,7 +3683,6 @@ export default function LeadsManagement({
                   <input
                     type="text"
                     className="form-control"
-                    
                     value={leadFormData.note}
                     onChange={(e) => setLeadFormData({ ...leadFormData, note: e.target.value })}
                   />
@@ -3957,7 +3958,6 @@ export default function LeadsManagement({
                     <input
                       type="email"
                       className="form-control"
-                      
                       value={quoteFormData.customerEmail}
                       onChange={(e) => setQuoteFormData({ ...quoteFormData, customerEmail: e.target.value })}
                     />
@@ -3996,9 +3996,9 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      
                       style={{ textTransform: 'uppercase' }}
-                      maxLength={15} value={quoteFormData.customerGst}
+                      maxLength={15}
+                      value={quoteFormData.customerGst}
                       onChange={(e) => setQuoteFormData({ ...quoteFormData, customerGst: e.target.value.toUpperCase() })}
                     />
                   </div>
@@ -4010,7 +4010,6 @@ export default function LeadsManagement({
                   <input
                     type="text"
                     className="form-control"
-                    
                     value={quoteFormData.customerAddress}
                     onChange={(e) => setQuoteFormData({ ...quoteFormData, customerAddress: e.target.value })}
                   />
@@ -4169,7 +4168,6 @@ export default function LeadsManagement({
                       type="text"
                       inputMode="numeric"
                       className="form-control"
-                      
                       value={quoteFormData.accessories}
                       onChange={(e) => {
                         const val = e.target.value;
@@ -4187,7 +4185,6 @@ export default function LeadsManagement({
                     type="text"
                     inputMode="numeric"
                     className="form-control"
-                    
                     value={quoteFormData.handling}
                     onChange={(e) => {
                       const val = e.target.value;

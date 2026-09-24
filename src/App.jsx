@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import DashboardOverview from './components/DashboardOverview';
@@ -217,6 +217,31 @@ export default function App() {
       return true;
     }
   });
+  const [globalToast, setGlobalToast] = useState(null);
+  const toastTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const showAppToast = (message, options = {}) => {
+      const tone = options.tone || 'success';
+      const duration = options.duration ?? 2800;
+      setGlobalToast({ message, tone });
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+      toastTimeoutRef.current = setTimeout(() => setGlobalToast(null), duration);
+    };
+
+    window.showAppToast = showAppToast;
+
+    return () => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+      delete window.showAppToast;
+    };
+  }, []);
 
   // Shared Company Profile State
   const readCompanyProfileFromStorage = () => {
@@ -1083,6 +1108,33 @@ export default function App() {
 
   return (
     <div className="app-container">
+      {globalToast && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            zIndex: 2000,
+            background: globalToast.tone === 'error' ? '#fee2e2' : '#ecfdf5',
+            border: `1px solid ${globalToast.tone === 'error' ? '#fca5a5' : '#a7f3d0'}`,
+            color: globalToast.tone === 'error' ? '#b91c1c' : '#047857',
+            borderRadius: '10px',
+            boxShadow: '0 12px 32px rgba(15, 23, 42, 0.14)',
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '0.9rem',
+            fontWeight: 700,
+            maxWidth: '360px',
+            animation: 'fadeIn 0.2s ease'
+          }}
+        >
+          <span style={{ fontSize: '1rem' }}>{globalToast.tone === 'error' ? '⚠' : '✓'}</span>
+          <span>{globalToast.message}</span>
+        </div>
+      )}
+
       {/* 1. Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}

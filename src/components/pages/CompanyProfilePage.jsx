@@ -74,6 +74,9 @@ export default function CompanyProfilePage({
       await setCompanyProfile(formData);
     }
     setProfileSuccess(true);
+    if (typeof window !== 'undefined' && window.showAppToast) {
+      window.showAppToast('Company profile saved successfully.');
+    }
     setTimeout(() => setProfileSuccess(false), 3500);
   };
 

@@ -88,6 +88,9 @@ export default function SettingsPage({
       setCompanyProfile(updatedProfile);
       if (setPrintSettings) setPrintSettings(normalizedPrintSettings);
       setSaveSuccess(true);
+      if (typeof window !== 'undefined' && window.showAppToast) {
+        window.showAppToast('Settings saved successfully.');
+      }
       setTimeout(() => setSaveSuccess(false), 3000);
     }
   };
@@ -223,6 +226,9 @@ export default function SettingsPage({
           printSettings: defaultSettings
         });
         setSaveSuccess(true);
+        if (typeof window !== 'undefined' && window.showAppToast) {
+          window.showAppToast('Settings reset and saved successfully.');
+        }
         setTimeout(() => setSaveSuccess(false), 3000);
       }
     }

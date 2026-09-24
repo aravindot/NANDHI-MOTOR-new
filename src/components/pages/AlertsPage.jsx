@@ -103,7 +103,7 @@ export default function AlertsPage({
         id: `ALT-SRV-${sb.id}`,
         type: 'Service Due',
         title: `Periodic Service Due: ${sb.customerName}`,
-        desc: `Vehicle ${sb.vehicleNo || 'Vehicle'} is due for scheduled 90-day maintenance checkup.`,
+        desc: `Vehicle ${(sb.vehicleNo || 'Vehicle').toUpperCase()} is due for scheduled 90-day maintenance checkup.`,
         severity: 'INFO',
         date: sb.date || todayStr,
         data: sb

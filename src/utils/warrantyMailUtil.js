@@ -8,7 +8,7 @@ export function buildWarrantyClaimMail({ claim = {}, companyProfile = {} } = {})
   const issueText = clean(claim.issueDescription || 'Not provided');
   const customerMobile = clean(claim.customerMobile || 'Not provided');
   const vehicleName = clean(claim.vehicleModel || 'Not provided');
-  const vehicleReg = clean(claim.vehicleRegNo || 'Not provided');
+  const vehicleReg = clean(claim.vehicleRegNo || 'Not provided').toUpperCase();
   const category = clean(claim.defectCategory || 'Not provided');
   const amount = Number(claim.claimAmount || 0);
   const date = clean(claim.submissionDate || new Date().toISOString().split('T')[0]);

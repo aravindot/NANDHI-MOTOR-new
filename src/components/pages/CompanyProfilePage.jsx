@@ -18,24 +18,25 @@ import {
   Upload,
   CheckCircle2
 } from 'lucide-react';
+import { getPrintTheme, readPrintSettingsFromStorage, openThemePrintWindow } from '../../utils/printSettings';
 
 export default function CompanyProfilePage({
   companyProfile = {
     name: 'NANDHI MOTORS',
     tagline: 'Authorized Two-Wheeler Sales, Genuine Spares & Service Dealership',
-    address: 'No. 12, Palani Main Road, Palani, Dindigul, Tamil Nadu - 624601',
-    phone: '+91 98421 55670',
-    altPhone: '+91 94432 19800',
-    email: 'contact@nandhimotors.com',
+    address: '170/2, ITTERI ROAD, PALANI-624601',
+    phone: '+91 7604857272',
+    altPhone: '+91 7604847272',
+    email: 'nandhimotorspalani@gmail.com',
     website: 'www.nandhimotors.com',
-    gstin: '33AABCN1234F1Z9',
+    gstin: '33BCXPA4714R1Z2',
     state: 'Tamil Nadu (33)',
-    pan: 'AABCN1234F',
-    bankName: 'HDFC Bank',
+    pan: '',
+    bankName: 'IDBI BANK',
     accountName: 'NANDHI MOTORS',
-    accountNumber: '50200088991234',
-    ifscCode: 'HDFC0001234',
-    branch: 'Namakkal Main Branch',
+    accountNumber: '0920102000007825',
+    ifscCode: 'IBKL0000920',
+    branch: 'PALANI BRANCH',
     upiId: 'nandhimotors@hdfcbank',
     upiQrImage: ''
   },
@@ -95,45 +96,28 @@ export default function CompanyProfilePage({
   };
 
   const handlePrintStandee = () => {
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Showroom UPI QR Standee - ${formData.name}</title>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; color: #1f2937; }
-            .standee-card { max-width: 420px; margin: 0 auto; border: 3px solid #059669; border-radius: 16px; padding: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-            .header-title { font-size: 24px; font-weight: 800; color: #059669; margin: 0 0 4px 0; text-transform: uppercase; }
-            .header-subtitle { font-size: 13px; color: #6b7280; margin: 0 0 20px 0; }
-            .qr-box { border: 2px dashed #059669; border-radius: 12px; padding: 15px; display: inline-block; background: #ffffff; margin-bottom: 20px; }
-            .qr-img { width: 240px; height: 240px; }
-            .upi-id-badge { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; font-family: monospace; font-size: 16px; font-weight: bold; padding: 8px 16px; border-radius: 8px; display: inline-block; margin-bottom: 15px; }
-            .apps-row { font-size: 12px; color: #4b5563; font-weight: 600; margin-top: 15px; border-top: 1px solid #e5e7eb; padding-top: 15px; }
-            .bank-info { font-size: 12px; color: #6b7280; margin-top: 10px; }
-          </style>
-        </head>
-        <body>
-          <div class="standee-card">
-            <h1 class="header-title">${formData.name}</h1>
-            <p class="header-subtitle">Scan & Pay with Any UPI App</p>
-            <div class="qr-box">
-              <img class="qr-img" src="${activeQrCodeUrl}" alt="UPI QR Code" />
-            </div>
-            <div>
-              <div class="upi-id-badge">UPI ID: ${formData.upiId || 'nandhimotors@hdfcbank'}</div>
-            </div>
-            <div class="bank-info">
-              Account: <strong>${formData.accountName || formData.name}</strong> | Bank: <strong>${formData.bankName || 'HDFC Bank'}</strong>
-            </div>
-            <div class="apps-row">
-              ACCEPTED APPS: Google Pay • PhonePe • Paytm • BHIM • Cred • Any UPI App
-            </div>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+    const settings = readPrintSettingsFromStorage();
+    const theme = getPrintTheme(settings);
+    const bodyHtml = `
+      <div class="print-theme-surface" style="max-width: 440px; text-align: center;">
+        <div class="theme-header" style="text-align: center;">${formData.name}</div>
+        <div style="margin-top: 20px; font-size: 13px; color: #6b7280;">Scan & Pay with Any UPI App</div>
+        <div style="margin: 20px auto; display: inline-block; border: 2px dashed ${theme.primary}; border-radius: 12px; padding: 14px; background: #ffffff;">
+          <img src="${activeQrCodeUrl}" alt="UPI QR Code" style="width: 240px; height: 240px; display: block;" />
+        </div>
+        <div style="display: inline-block; padding: 8px 18px; border-radius: 999px; background: ${theme.highlight}; color: ${theme.primary}; font-family: monospace; font-size: 15px; font-weight: 700; margin-bottom: 14px;">
+          UPI ID: ${formData.upiId || 'nandhimotors@hdfcbank'}
+        </div>
+        <div style="font-size: 12px; color: #6b7280;">
+          Account: <strong>${formData.accountName || formData.name}</strong> | Bank: <strong>${formData.bankName || 'HDFC Bank'}</strong>
+        </div>
+        <div style="margin-top: 18px; font-size: 12px; color: #4b5563; font-weight: 600; border-top: 1px solid #e5e7eb; padding-top: 14px;">
+          ACCEPTED APPS: Google Pay • PhonePe • Paytm • BHIM • Cred • Any UPI App
+        </div>
+      </div>
+    `;
+
+    openThemePrintWindow(`Showroom UPI QR Standee - ${formData.name}`, bodyHtml, settings);
   };
 
   return (

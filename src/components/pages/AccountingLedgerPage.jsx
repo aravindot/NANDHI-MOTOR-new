@@ -42,6 +42,7 @@ import {
   Check,
   X
 } from 'lucide-react';
+import { readPrintSettingsFromStorage, openThemePrintWindow } from '../../utils/printSettings';
 
 export default function AccountingLedgerPage({
   activeSubTab = 'receivable',
@@ -313,7 +314,7 @@ export default function AccountingLedgerPage({
         sourceModule: 'Service',
         customerName: sb.customerName || 'Service Customer',
         customerPhone: sb.customerPhone || '',
-        particulars: `Vehicle Service: ${sb.vehicleNo || ''} (Job #${sb.jobSheetId || sbId})`,
+        particulars: `Vehicle Service: ${(sb.vehicleNo || '').toUpperCase()} (Job #${sb.jobSheetId || sbId})`,
         date: dateStr,
         totalAmount: total,
         paidAmount: paid,
@@ -554,7 +555,7 @@ export default function AccountingLedgerPage({
         refNo: `SB-${sb.id}`,
         accountHead: '1010 - Cash / Bank Collection',
         contraAccount: '4030 - Service Income',
-        narration: `Service Bill #${sb.id} - ${sb.customerName || 'Customer'} (${sb.vehicleNo || ''})`,
+        narration: `Service Bill #${sb.id} - ${sb.customerName || 'Customer'} (${(sb.vehicleNo || '').toUpperCase()})`,
         debit: total,
         credit: 0,
         category: 'Service'
@@ -1376,7 +1377,39 @@ export default function AccountingLedgerPage({
   };
 
   const handlePrintStatement = () => {
-    window.print();
+    const settings = readPrintSettingsFromStorage();
+    const topic = currentTab === 'trial-balance' ? 'Trial Balance' : currentTab === 'pnl' ? 'P&L Statement' : currentTab === 'balance-sheet' ? 'Balance Sheet' : 'Accounting Statement';
+    const rows = currentTab === 'receivable' ? filteredReceivables : currentTab === 'payable' ? filteredPayables : currentTab === 'expense' ? filteredExpenses : currentTab === 'general-ledger' ? filteredGlTransactions : currentTab === 'trial-balance' ? trialBalanceData : [];
+
+    const tableRows = rows.length ? rows.map(row => {
+      const cells = Object.values(row).slice(0, 6).map(value => `<td>${String(value ?? '')}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('') : '<tr><td colspan="6">No data available for the selected tab.</td></tr>';
+
+    const bodyHtml = `
+      <div class="print-theme-surface">
+        <div class="theme-header">${topic}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin: 18px 0; gap: 12px; flex-wrap: wrap;">
+          <div style="font-weight: 700; color: #1f2937; font-size: 18px;">NANDHI MOTORS</div>
+          <div class="theme-badge">Print Ready</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Reference</th>
+              <th>Name</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th>Amount</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    `;
+
+    openThemePrintWindow(`${topic} - NANDHI MOTORS`, bodyHtml, settings);
   };
 
   return (

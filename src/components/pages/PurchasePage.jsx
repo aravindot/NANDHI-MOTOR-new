@@ -27,7 +27,8 @@ export default function PurchasePage({
   spares = [],
   setSpares,
   vehicles = [],
-  showPreviews = true
+  showPreviews = true,
+  companyProfile
 }) {
   const [printModalConfig, setPrintModalConfig] = useState({ isOpen: false, type: 'purchase', data: null });
   const [searchQuery, setSearchQuery] = useState('');
@@ -474,10 +475,15 @@ export default function PurchasePage({
               <div className="invoice-container">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #059669', paddingBottom: '12px' }}>
                   <div>
-                    <div className="invoice-title" style={{ textAlign: 'left', margin: 0, fontSize: '1.25rem' }}>NANDHI MOTORS</div>
+                    <div className="invoice-title" style={{ textAlign: 'left', margin: 0, fontSize: '1.25rem' }}>{companyProfile?.name || 'NANDHI MOTORS'}</div>
                     <p style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 600, margin: '2px 0 0' }}>
                       Inbound Goods Receipt & Purchase Voucher
                     </p>
+                    {companyProfile?.address && (
+                      <p style={{ fontSize: '0.72rem', color: '#6b7280', margin: '2px 0 0' }}>
+                        {companyProfile.address}
+                      </p>
+                    )}
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <span
@@ -926,6 +932,7 @@ export default function PurchasePage({
           onClose={() => setPrintModalConfig({ isOpen: false, type: 'purchase', data: null })}
           type={printModalConfig.type}
           data={printModalConfig.data}
+          companyProfile={{ ...companyProfile, printSettings: companyProfile?.printSettings || readPrintSettingsFromStorage() }}
         />
       )}
     </div>

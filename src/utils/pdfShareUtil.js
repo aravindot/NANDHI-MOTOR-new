@@ -1,20 +1,23 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { DEFAULT_PRINT_SETTINGS, getEffectivePrintSettings, getPrintTheme, readPrintSettingsFromStorage } from './printSettings';
+import { formatAadhar } from './formatUtils';
 
 const DEFAULT_PROFILE = {
   name: 'NANDHI MOTORS',
   tagline: 'Authorized Two-Wheeler Sales, Genuine Spares & Service Dealership',
-  address: 'No. 12, Palani Main Road, Palani, Dindigul, Tamil Nadu - 624601',
-  phone: '+91 98421 55670',
-  email: 'contact@nandhimotors.com',
+  address: '170/2, ITTERI ROAD, PALANI-624601',
+  phone: '+91 7604857272',
+  altPhone: '+91 7604847272',
+  email: 'nandhimotorspalani@gmail.com',
   website: 'www.nandhimotors.com',
-  gstin: '33AABCN1234F1Z9',
+  gstin: '33BCXPA4714R1Z2',
   state: 'Tamil Nadu (33)',
-  bankName: 'HDFC Bank',
+  bankName: 'IDBI BANK',
   accountName: 'NANDHI MOTORS',
-  accountNumber: '50200088991234',
-  ifscCode: 'HDFC0001234',
-  branch: 'Namakkal Main Branch',
+  accountNumber: '0920102000007825',
+  ifscCode: 'IBKL0000920',
+  branch: 'PALANI BRANCH',
   upiId: 'nandhimotors@hdfcbank',
   quotationTerms: `1. Prices quoted are valid for 7 days from the date of issuance and subject to manufacturer price revisions.
 2. Final delivery is subject to availability of vehicle stock and color chosen at the time of final booking.
@@ -53,11 +56,22 @@ function formatRs(amount) {
   return `Rs. ${num.toLocaleString('en-IN')}`;
 }
 
+function hexToRgb(hex = '#059669') {
+  const clean = String(hex).replace('#', '');
+  const expanded = clean.length === 3 ? clean.split('').map(ch => ch + ch).join('') : clean;
+  const int = Number.parseInt(expanded, 16) || 0;
+  return [(int >> 16) & 255, (int >> 8) & 255, int & 255];
+}
+
+function getCompanyPhones(profile) {
+  return [profile.phone, profile.altPhone].filter(Boolean).join(' / ');
+}
+
 /**
  * Generate 100% Guaranteed Visible Vector PDF for Tax Invoice
  * (Uses native autoTable cells for Buyer Details & Vehicle Specifications so they NEVER get hidden)
  */
-export function buildTaxInvoicePdf(inv, customProfile = null) {
+export function buildTaxInvoicePdf(inv, customProfile = null, settings = undefined, documentType = 'invoice') {
   const profile = customProfile || getStoredProfile();
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -65,8 +79,11 @@ export function buildTaxInvoicePdf(inv, customProfile = null) {
     format: 'a4'
   });
 
-  const emeraldColor = [5, 150, 105];
-  const textDark = [17, 24, 39];
+  const selectedSettings = settings && Object.keys(settings).length ? settings : readPrintSettingsFromStorage();
+  const effectiveSettings = getEffectivePrintSettings(selectedSettings, documentType);
+  const theme = getPrintTheme({ ...selectedSettings, ...effectiveSettings }, documentType);
+  const primaryColor = hexToRgb(theme.primary);
+  const textDark = hexToRgb(theme.secondary);
   const textMuted = [75, 85, 99];
   const borderLine = [209, 213, 219];
 
@@ -74,7 +91,7 @@ export function buildTaxInvoicePdf(inv, customProfile = null) {
   const custName = inv.customerName || inv.name || inv.customer || 'Valued Customer';
   const custPhone = inv.customerPhone || inv.customerMobile || inv.phone || inv.mobile || 'N/A';
   const custAddress = inv.customerAddress || inv.address || 'Showroom Direct Delivery, Namakkal';
-  const custAadhar = inv.customerAadhar || inv.aadhar || inv.aadhaar || 'N/A (Verified)';
+  const custAadhar = formatAadhar(inv.customerAadhar || inv.aadhar || inv.aadhaar) || 'N/A (Verified)';
   const custGst = inv.customerGst || inv.gst || inv.gstin || '';
 
   const vehModel = inv.vehicleModel || inv.model || inv.vehicle || 'Honda Activa 6G';
@@ -84,12 +101,11 @@ export function buildTaxInvoicePdf(inv, customProfile = null) {
   const batteryNo = inv.batteryNumber || inv.batteryNo || 'BAT-2026-NANDHI';
   const chargerNo = inv.chargerNumber || inv.chargerNo || 'CHG-9921';
   const controllerNo = inv.controllerNumber || inv.controllerNo || 'CTRL-8812';
+  const hypothecation = inv.hypothecation || inv.finance || inv.financier || inv.hypothecationDetails || '';
   const warranty = inv.warrantyDetails || '3 Years or 40,000 KMs for Motor, Controller, Cluster & Battery (Whichever is earlier)';
 
   const invNo = inv.invoiceNo || inv.id || '01';
   const invDate = inv.invoiceDate || inv.createdOn || inv.date || new Date().toLocaleDateString('en-IN');
-  const payStatus = inv.paymentStatus || 'Fully Paid';
-
   const ex = Number(inv.exShowroom || (Number(inv.grandTotal || 0) * 0.78) || 75000);
   const gstRate = Number(inv.gstRate || 5);
   const gstAmt = Number(inv.gstAmount || Math.round(ex * (gstRate / 100)) || 3750);
@@ -102,7 +118,7 @@ export function buildTaxInvoicePdf(inv, customProfile = null) {
   // 1. BRAND HEADER
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(19);
-  doc.setTextColor(...emeraldColor);
+  doc.setTextColor(...primaryColor);
   doc.text(profile.name, 105, 13, { align: 'center' });
 
   doc.setFontSize(8.5);
@@ -113,10 +129,10 @@ export function buildTaxInvoicePdf(inv, customProfile = null) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...textMuted);
-  doc.text(`${profile.address} | Phone: ${profile.phone} | GSTIN: ${profile.gstin}`, 105, 21.5, { align: 'center' });
+  doc.text(`${profile.address} | Phone: ${getCompanyPhones(profile)} | GSTIN: ${profile.gstin}`, 105, 21.5, { align: 'center' });
 
   // Badge Title
-  doc.setFillColor(17, 24, 39);
+  doc.setFillColor(...primaryColor);
   doc.roundedRect(75, 24, 60, 6, 1.5, 1.5, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
@@ -134,27 +150,17 @@ export function buildTaxInvoicePdf(inv, customProfile = null) {
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...textDark);
   doc.text(`Invoice No: `, 14, yPos);
-  doc.setTextColor(...emeraldColor);
+  doc.setTextColor(...primaryColor);
   doc.text(`#${invNo}`, 33, yPos);
 
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...textDark);
-  doc.text(`|  Date: `, 45, yPos);
+  doc.text('Date:', 142, yPos, { align: 'right' });
   doc.setFont('helvetica', 'bold');
-  doc.text(`${invDate}`, 57, yPos);
-
-  // Payment Status & State Code
-  doc.setFont('helvetica', 'bold');
-  if (payStatus === 'Fully Paid') {
-    doc.setTextColor(4, 120, 87);
-  } else {
-    doc.setTextColor(185, 28, 28);
-  }
-  doc.text(`Payment Status: ${payStatus}`, 130, yPos);
+  doc.text(`${invDate}`, 196, yPos, { align: 'right' });
 
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...textMuted);
-  doc.text(`| State: 33 (Tamil Nadu)`, 196, yPos, { align: 'right' });
 
   yPos += 2;
   doc.setDrawColor(...borderLine);
@@ -162,7 +168,7 @@ export function buildTaxInvoicePdf(inv, customProfile = null) {
 
   // 3. 2-COLUMN BUYER DETAILS & VEHICLE SPECIFICATIONS (autoTable guaranteed visibility)
   const buyerDetailsText = `Customer Name: ${custName}\nMobile Number: ${custPhone}\nBilling Address: ${custAddress}\nAadhaar Number: ${custAadhar}\nCustomer GSTIN: ${custGst || 'Unregistered Consumer'}\nPlace of Supply: Tamil Nadu (Code 33)`;
-  const vehicleSpecsText = `Model & Variant: ${vehModel}\nColor / Shade: ${vehColor}\nChassis / VIN: ${vinNo}\nMotor / Engine: ${engineNo}\nBattery Serial: ${batteryNo}\nCharger / Ctrl: ${chargerNo} / ${controllerNo}`;
+  const vehicleSpecsText = `Color: ${vehColor}\nVIN No: ${vinNo}\nMotor No: ${engineNo}\nBattery Serial: ${batteryNo}\nCharger / Ctrl: ${chargerNo} / ${controllerNo}${hypothecation ? `\nFinance / Hypothecation: ${hypothecation}` : ''}`;
 
   autoTable(doc, {
     startY: yPos + 3,
@@ -307,7 +313,7 @@ export function buildTaxInvoicePdf(inv, customProfile = null) {
     },
     columns: [
       { header: 'Sl.', dataKey: 'sl' },
-      { header: 'Description of Goods / Vehicle Supply', dataKey: 'desc' },
+      { header: 'Description', dataKey: 'desc' },
       { header: 'HSN/SAC', dataKey: 'hsn' },
       { header: 'Qty', dataKey: 'qty' },
       { header: 'Taxable Value', dataKey: 'taxable' },
@@ -334,8 +340,6 @@ export function buildTaxInvoicePdf(inv, customProfile = null) {
   const bankDetailsText = `Bank: ${profile.bankName} (${profile.branch})\nA/C Name: ${profile.accountName}\nAccount No: ${profile.accountNumber}\nIFSC Code: ${profile.ifscCode}\nUPI ID: ${profile.upiId}`;
 
   let summaryText = `Sub Total (Ex-Showroom): ${formatRs(ex)}\nTotal GST Tax: ${formatRs(gstAmt)}`;
-  if (ins > 0) summaryText += `\nInsurance: ${formatRs(ins)}`;
-  if (rto > 0) summaryText += `\nRTO & Road Tax: ${formatRs(rto)}`;
   if (sub > 0) summaryText += `\nSubsidy Benefit: -${formatRs(sub)}`;
   if (disc > 0) summaryText += `\nDiscount: -${formatRs(disc)}`;
   summaryText += `\n\nGRAND TOTAL: ${formatRs(grandTotal)}`;
@@ -374,31 +378,13 @@ export function buildTaxInvoicePdf(inv, customProfile = null) {
 
   yPos = doc.lastAutoTable.finalY + 12;
 
-  // 6. SIGNATURE BLOCK
-  doc.setDrawColor(17, 24, 39);
-  doc.setLineWidth(0.3);
-  doc.line(18, yPos, 70, yPos);
-  doc.line(140, yPos, 192, yPos);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...textDark);
-  doc.text('Customer Acceptance Signature', 44, yPos + 4, { align: 'center' });
-  doc.text(`For ${profile.name}`, 166, yPos + 4, { align: 'center' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(...textMuted);
-  doc.text('I accept vehicle in sound condition', 44, yPos + 8, { align: 'center' });
-  doc.text('Authorized Dealership Signatory', 166, yPos + 8, { align: 'center' });
-
   return doc;
 }
 
 /**
  * Generate Exact Matching Pure Vector PDF for Price Quotation
  */
-export function buildQuotationPdf(quote, customProfile = null) {
+export function buildQuotationPdf(quote, customProfile = null, settings = undefined, documentType = 'quotation') {
   const profile = customProfile || getStoredProfile();
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -406,8 +392,11 @@ export function buildQuotationPdf(quote, customProfile = null) {
     format: 'a4'
   });
 
-  const emeraldColor = [5, 150, 105];
-  const textDark = [17, 24, 39];
+  const selectedSettings = settings && Object.keys(settings).length ? settings : readPrintSettingsFromStorage();
+  const effectiveSettings = getEffectivePrintSettings(selectedSettings, documentType);
+  const theme = getPrintTheme({ ...selectedSettings, ...effectiveSettings }, documentType);
+  const primaryColor = hexToRgb(theme.primary);
+  const textDark = hexToRgb(theme.secondary);
   const textMuted = [75, 85, 99];
   const borderLine = [209, 213, 219];
 
@@ -432,7 +421,7 @@ export function buildQuotationPdf(quote, customProfile = null) {
   // 1. BRAND HEADER
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(19);
-  doc.setTextColor(...emeraldColor);
+  doc.setTextColor(...primaryColor);
   doc.text(profile.name, 105, 13, { align: 'center' });
 
   doc.setFontSize(8.5);
@@ -443,10 +432,10 @@ export function buildQuotationPdf(quote, customProfile = null) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...textMuted);
-  doc.text(`${profile.address} | Phone: ${profile.phone} | GSTIN: ${profile.gstin}`, 105, 21.5, { align: 'center' });
+  doc.text(`${profile.address} | Phone: ${getCompanyPhones(profile)} | GSTIN: ${profile.gstin}`, 105, 21.5, { align: 'center' });
 
   // Badge Title
-  doc.setFillColor(5, 150, 105);
+  doc.setFillColor(...primaryColor);
   doc.roundedRect(58, 24, 94, 6, 1.5, 1.5, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
@@ -455,7 +444,7 @@ export function buildQuotationPdf(quote, customProfile = null) {
 
   const custAddr = quote.customerAddress || quote.address || '';
   const custEmail = quote.customerEmail || quote.email || '';
-  const custAadhar = quote.customerAadhar || quote.aadhar || '';
+  const custAadhar = formatAadhar(quote.customerAadhar || quote.aadhar || '');
   const custGst = quote.customerGst || quote.gstin || '';
   const exec = quote.executive || quote.salesExecutive || '';
 
@@ -598,25 +587,13 @@ export function buildQuotationPdf(quote, customProfile = null) {
     yPos += 4;
   }
 
-  // 6. SIGNATURES
-  doc.setDrawColor(17, 24, 39);
-  doc.setLineWidth(0.3);
-  doc.line(18, yPos, 70, yPos);
-  doc.line(140, yPos, 192, yPos);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...textDark);
-  doc.text('Customer Acknowledgment', 44, yPos + 4, { align: 'center' });
-  doc.text('Sales Executive Sign', 166, yPos + 4, { align: 'center' });
-
   return doc;
 }
 
 /**
  * 1-Click Quotation PDF & WhatsApp Dispatcher
  */
-export async function generateQuotationPdfAndShare(quote, customProfile = null, isDownloadOnly = false) {
+export async function generateQuotationPdfAndShare(quote, customProfile = null, isDownloadOnly = false, settings = undefined, documentType = 'quotation') {
   const profile = customProfile || getStoredProfile();
   const rawPhone = quote.customerPhone || quote.customerMobile || quote.phone || quote.mobile || '';
   const phone = isDownloadOnly ? '' : cleanCustomerPhone(rawPhone);
@@ -625,7 +602,7 @@ export async function generateQuotationPdfAndShare(quote, customProfile = null, 
   const safeName = (quote.customerName || quote.name || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
   const filename = `NandhiMotors_Quotation_${quote.quoteId || 'QT-01'}_${safeName}.pdf`;
 
-  const doc = buildQuotationPdf(quote, profile);
+  const doc = buildQuotationPdf(quote, profile, settings, documentType);
 
   if (isDownloadOnly) {
     doc.save(filename);
@@ -650,7 +627,7 @@ export async function generateQuotationPdfAndShare(quote, customProfile = null, 
     `*Estimated On-Road Total: ${formatRs(quote.total || 0)}*\n` +
     `----------------------------------------\n` +
     `Validity: 7 Days from issue date.\n` +
-    `Showroom Helpline: +91 98421 55670`;
+    `Showroom Helpline: ${getCompanyPhones(profile)}`;
 
   // 1. Mobile Web Share with PDF File
   if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
@@ -679,7 +656,7 @@ export async function generateQuotationPdfAndShare(quote, customProfile = null, 
 /**
  * 1-Click Invoice PDF & WhatsApp Dispatcher
  */
-export async function generateInvoicePdfAndShare(invoice, customProfile = null, isDownloadOnly = false) {
+export async function generateInvoicePdfAndShare(invoice, customProfile = null, isDownloadOnly = false, settings = undefined, documentType = 'invoice') {
   const profile = customProfile || getStoredProfile();
   const rawPhone = invoice.customerPhone || invoice.customerMobile || invoice.phone || invoice.mobile || '';
   const phone = isDownloadOnly ? '' : cleanCustomerPhone(rawPhone);
@@ -688,7 +665,7 @@ export async function generateInvoicePdfAndShare(invoice, customProfile = null, 
   const safeName = (invoice.customerName || invoice.name || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
   const filename = `NandhiMotors_TaxInvoice_${invoice.invoiceNo || '01'}_${safeName}.pdf`;
 
-  const doc = buildTaxInvoicePdf(invoice, profile);
+  const doc = buildTaxInvoicePdf(invoice, profile, settings, documentType);
 
   if (isDownloadOnly) {
     doc.save(filename);
@@ -709,16 +686,13 @@ export async function generateInvoicePdfAndShare(invoice, customProfile = null, 
     `----------------------------------------\n` +
     `• Ex-Showroom Base: ${formatRs(invoice.exShowroom || 0)}\n` +
     `• GST Tax Amount: ${formatRs(invoice.gstAmount || 0)}\n` +
-    (Number(invoice.insurance || 0) > 0 ? `• Insurance: ${formatRs(invoice.insurance)}\n` : '') +
-    (Number(invoice.rto || 0) > 0 ? `• RTO & Road Tax: ${formatRs(invoice.rto)}\n` : '') +
     (Number(invoice.subsidy || 0) > 0 ? `• Subsidy Benefit: -${formatRs(invoice.subsidy)}\n` : '') +
     (Number(invoice.discount || 0) > 0 ? `• Special Discount: -${formatRs(invoice.discount)}\n` : '') +
     `----------------------------------------\n` +
     `*Grand Total: ${formatRs(invoice.grandTotal || 0)}*\n` +
-    `*Payment Status:* ${invoice.paymentStatus || 'Fully Paid'} ✅\n` +
     `----------------------------------------\n` +
     `Bank: ${profile.bankName} | A/C: ${profile.accountNumber} | IFSC: ${profile.ifscCode}\n` +
-    `Thank you for choosing Nandhi Motors! Helpline: +91 98421 55670`;
+    `Thank you for choosing Nandhi Motors! Helpline: ${getCompanyPhones(profile)}`;
 
   // 1. Mobile Web Share with PDF File
   if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {

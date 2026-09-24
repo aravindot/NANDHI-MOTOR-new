@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   X
 } from 'lucide-react';
+import { formatAadhar } from '../../utils/formatUtils';
 
 export default function CustomersPage({ customers = [], setCustomers }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,7 +83,7 @@ export default function CustomersPage({ customers = [], setCustomers }) {
       name: customer.name || '',
       mobile: customer.mobile || '',
       email: customer.email || '',
-      aadhar: customer.aadhar || '',
+      aadhar: formatAadhar(customer.aadhar || ''),
       address: customer.address || '',
       source: customer.source || 'Walk-In',
       vehicleModel: customer.vehicleModel || '',
@@ -366,7 +367,7 @@ export default function CustomersPage({ customers = [], setCustomers }) {
                       </a>
                     </p>
                     <p><strong>Email:</strong> {activeCustomer.email || '—'}</p>
-                    <p><strong>Aadhaar / ID:</strong> {activeCustomer.aadhar || '—'}</p>
+                    <p><strong>Aadhaar / ID:</strong> {formatAadhar(activeCustomer.aadhar) || '—'}</p>
                     <p><strong>Address:</strong> {activeCustomer.address || '—'}</p>
                   </div>
 
@@ -519,9 +520,10 @@ export default function CustomersPage({ customers = [], setCustomers }) {
                   <input
                     type="text"
                     className="form-control"
-                    
-                    maxLength={12} pattern="[0-9]{12}" value={formData.aadhar}
-                    onChange={(e) => setFormData({ ...formData, aadhar: e.target.value })}
+                    placeholder="XXXX XXXX XXXX"
+                    maxLength={14}
+                    value={formData.aadhar}
+                    onChange={(e) => setFormData({ ...formData, aadhar: formatAadhar(e.target.value) })}
                   />
                 </div>
 

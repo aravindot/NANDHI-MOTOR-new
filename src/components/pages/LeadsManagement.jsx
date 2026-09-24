@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, Phone, CheckCircle, Trash2, Calendar, Clipboard, Calculator, Printer, FileCode, Edit2, MessageCircle, BarChart3, Download, Filter, TrendingUp, DollarSign, FileDown, FileText, Bell, BellOff, Clock, AlertTriangle, AlertCircle, Receipt, ArrowRight, SlidersHorizontal, RotateCcw, Users, FileSpreadsheet, Layers, PieChart, CheckCheck, ArrowUpRight } from 'lucide-react';
 import PrintPreviewModal from '../PrintPreviewModal';
 import { generateQuotationPdfAndShare, generateInvoicePdfAndShare } from '../../utils/pdfShareUtil';
+import { formatAadhar } from '../../utils/formatUtils';
 import { API_BASE_URL } from '../../config/api';
 
 export default function LeadsManagement({
@@ -25,6 +26,40 @@ export default function LeadsManagement({
   customers = []
 }) {
   const [printModalConfig, setPrintModalConfig] = useState({ isOpen: false, type: 'invoice', data: null });
+
+  // Effective Company Profile with live fallback
+  const effectiveCompanyProfile = React.useMemo(() => {
+    if (companyProfile && companyProfile.name) return companyProfile;
+    try {
+      const primary = localStorage.getItem('nandhi_app_company_profile');
+      if (primary) {
+        const parsed = JSON.parse(primary);
+        if (parsed && parsed.name) return parsed;
+      }
+      const legacy = localStorage.getItem('nandhi_company_profile');
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        if (parsed && parsed.name) return parsed;
+      }
+    } catch (e) {}
+    return {
+      name: 'NANDHI MOTORS',
+      tagline: 'Authorized Two-Wheeler Sales, Genuine Spares & Service Dealership',
+      address: '170/2, ITTERI ROAD, PALANI-624601',
+      phone: '+91 7604857272',
+      altPhone: '+91 7604847272',
+      email: 'nandhimotorspalani@gmail.com',
+      website: 'www.nandhimotors.com',
+      gstin: '33BCXPA4714R1Z2',
+      state: 'Tamil Nadu (33)',
+      bankName: 'IDBI BANK',
+      accountName: 'NANDHI MOTORS',
+      accountNumber: '0920102000007825',
+      ifscCode: 'IBKL0000920',
+      branch: 'PALANI BRANCH',
+      upiId: 'nandhimotors@hdfcbank'
+    };
+  }, [companyProfile]);
 
   // Dynamic Vehicle Data Registry for Dropdowns built from active database list
   const vehicleList = React.useMemo(() => {
@@ -200,14 +235,12 @@ export default function LeadsManagement({
     batteryNumber: '',
     chargerNumber: '',
     controllerNumber: '',
+    hypothecation: '',
     warrantyDetails: '3 Years or 40,000 KMs for Motor, Controller, Cluster & Battery (Whichever is earlier)',
     exShowroom: '',
     gstRate: 5,
-    insurance: '',
-    rto: '',
     subsidy: '0',
-    discount: '0',
-    paymentStatus: 'Fully Paid'
+    discount: '0'
   });
   const [generatedInvoice, setGeneratedInvoice] = useState(() => (invoices && invoices.length > 0 ? invoices[0] : null));
   const [generatedLead, setGeneratedLead] = useState(() => (leads && leads.length > 0 ? leads[0] : null));
@@ -324,12 +357,10 @@ export default function LeadsManagement({
     const ex = Number(invoiceFormData.exShowroom || 0);
     const gstRate = Number(invoiceFormData.gstRate || 0);
     const gstAmount = Math.round(ex * (gstRate / 100));
-    const ins = Number(invoiceFormData.insurance || 0);
-    const rtoVal = Number(invoiceFormData.rto || 0);
     const sub = Number(invoiceFormData.subsidy || 0);
     const disc = Number(invoiceFormData.discount || 0);
 
-    const totalBeforeRoundoff = ex + gstAmount + ins + rtoVal - sub - disc;
+    const totalBeforeRoundoff = ex + gstAmount - sub - disc;
     const grandTotal = Math.round(totalBeforeRoundoff);
     const roundoffAdjustment = Number((grandTotal - totalBeforeRoundoff).toFixed(2));
 
@@ -356,13 +387,14 @@ export default function LeadsManagement({
       batteryNumber: (invoiceFormData.batteryNumber || '').toUpperCase(),
       chargerNumber: (invoiceFormData.chargerNumber || '').toUpperCase(),
       controllerNumber: (invoiceFormData.controllerNumber || '').toUpperCase(),
+      hypothecation: (invoiceFormData.hypothecation || '').trim(),
       customerGst: (invoiceFormData.customerGst || '').toUpperCase(),
       invoiceDate: invoiceFormData.invoiceDate || new Date().toISOString().split('T')[0],
       createdOn: invoiceFormData.createdOn || new Date().toLocaleDateString('en-IN'),
       exShowroom: Number(invoiceFormData.exShowroom || 0),
       gstRate: Number(invoiceFormData.gstRate || 0),
-      insurance: Number(invoiceFormData.insurance || 0),
-      rto: Number(invoiceFormData.rto || 0),
+      insurance: 0,
+      rto: 0,
       subsidy: Number(invoiceFormData.subsidy || 0),
       discount: Number(invoiceFormData.discount || 0),
       gstAmount: details.gstAmount,
@@ -387,20 +419,19 @@ export default function LeadsManagement({
       customerName: q.customerName || '',
       customerPhone: q.customerPhone || '',
       customerAddress: q.customerAddress || '',
-      customerAadhar: q.customerAadhar || '',
+      customerAadhar: formatAadhar(q.customerAadhar || ''),
       customerGst: (q.customerGst || '').toUpperCase(),
       vehicleModel: q.vehicleModel || (vehicleList[0] && vehicleList[0].name) || '',
       vehicleColor: q.vehicleColor || (allVehicleColors && allVehicleColors[0]) || '',
       exShowroom: q.exShowroom ? Number(q.exShowroom) : '',
       gstRate: q.gstRate !== undefined ? Number(q.gstRate) : 5,
-      insurance: q.insurance ? Number(q.insurance) : '',
-      rto: q.rto ? Number(q.rto) : '',
+      insurance: '',
+      rto: '',
       discount: q.discount ? Number(q.discount) : 0,
       vinNumber: '',
       batteryNumber: '',
       chargerNumber: '',
       controllerNumber: '',
-      paymentStatus: 'Fully Paid'
     }));
     setEditingInvoiceId(null);
     setActiveSubTab('invoice');
@@ -433,7 +464,7 @@ export default function LeadsManagement({
       customerPhone: matchedLead.mobile || '',
       customerAddress: matchedLead.address || prev.customerAddress || '',
       customerEmail: matchedLead.email || prev.customerEmail || '',
-      customerAadhar: matchedLead.aadhar || prev.customerAadhar || '',
+      customerAadhar: formatAadhar(matchedLead.aadhar || prev.customerAadhar || ''),
       executive: matchedLead.executive || prev.executive || '',
       vehicleModel: vModel,
       vehicleColor: vColor,
@@ -575,7 +606,7 @@ export default function LeadsManagement({
       customerBirthday: match.birthday || match.customerBirthday || prev.customerBirthday,
       customerAddress: match.address || match.customerAddress || prev.customerAddress,
       customerEmail: match.email || match.customerEmail || prev.customerEmail,
-      customerAadhar: match.aadhar || match.customerAadhar || prev.customerAadhar,
+      customerAadhar: formatAadhar(match.aadhar || match.customerAadhar || prev.customerAadhar || ''),
       customerGst: (match.gstin || match.gst || match.customerGst || prev.customerGst || '').toUpperCase(),
       vehicleModel: vModel || prev.vehicleModel,
       vehicleColor: vColor || prev.vehicleColor,
@@ -607,7 +638,7 @@ export default function LeadsManagement({
       customerPhone: lead.mobile || '',
       customerAddress: lead.address || '',
       customerEmail: lead.email || '',
-      customerAadhar: lead.aadhar || '',
+      customerAadhar: formatAadhar(lead.aadhar || ''),
       customerGst: '',
       executive: lead.executive || executiveList[0] || 'Kishore Kumar',
       vehicleModel: vModel,
@@ -666,7 +697,7 @@ export default function LeadsManagement({
       customerPhone: q.customerPhone || '',
       customerAddress: q.customerAddress || '',
       customerEmail: q.customerEmail || '',
-      customerAadhar: q.customerAadhar || '',
+      customerAadhar: formatAadhar(q.customerAadhar || ''),
       customerGst: q.customerGst || '',
       executive: q.executive || executiveList[0] || 'Kishore Kumar',
       vehicleModel: q.vehicleModel || (vehicleList[0] && vehicleList[0].name) || '',
@@ -691,7 +722,7 @@ export default function LeadsManagement({
       customerPhone: inv.customerPhone || inv.customerMobile || '',
       customerBirthday: inv.customerBirthday || '',
       customerAddress: inv.customerAddress || '',
-      customerAadhar: inv.customerAadhar || '',
+      customerAadhar: formatAadhar(inv.customerAadhar || ''),
       customerGst: (inv.customerGst || '').toUpperCase(),
       vehicleModel: inv.vehicleModel || (vehicleList[0] && vehicleList[0].name) || '',
       vehicleColor: inv.vehicleColor || (allVehicleColors && allVehicleColors[0]) || '',
@@ -699,6 +730,7 @@ export default function LeadsManagement({
       batteryNumber: (inv.batteryNumber || inv.batteryNo || '').toUpperCase(),
       chargerNumber: (inv.chargerNumber || inv.chargerNo || '').toUpperCase(),
       controllerNumber: (inv.controllerNumber || inv.controllerNo || '').toUpperCase(),
+      hypothecation: inv.hypothecation || '',
       warrantyDetails: inv.warrantyDetails || '3 Years or 40,000 KMs for Motor, Controller, Cluster & Battery (Whichever is earlier)',
       exShowroom: inv.exShowroom || '',
       gstRate: inv.gstRate || 5,
@@ -713,19 +745,19 @@ export default function LeadsManagement({
 
   // WhatsApp Messaging & PDF Dispatch Helpers
   const handleShareQuoteWhatsApp = async (q) => {
-    await generateQuotationPdfAndShare(q);
+    await generateQuotationPdfAndShare(q, effectiveCompanyProfile);
   };
 
   const handleDownloadQuotePdf = async (q) => {
-    await generateQuotationPdfAndShare(q, null, true);
+    await generateQuotationPdfAndShare(q, effectiveCompanyProfile, true);
   };
 
   const handleShareInvoiceWhatsApp = async (inv) => {
-    await generateInvoicePdfAndShare(inv);
+    await generateInvoicePdfAndShare(inv, effectiveCompanyProfile);
   };
 
   const handleDownloadInvoicePdf = async (inv) => {
-    await generateInvoicePdfAndShare(inv, null, true);
+    await generateInvoicePdfAndShare(inv, effectiveCompanyProfile, true);
   };
 
   // Fetch bookings on subtab load (without deleting existing entries)
@@ -762,7 +794,7 @@ export default function LeadsManagement({
       customerName: b.customerName || '',
       customerPhone: b.mobile || '',
       customerAddress: b.address || prev.customerAddress || '',
-      customerAadhar: b.customerAadhar || prev.customerAadhar || '',
+      customerAadhar: formatAadhar(b.customerAadhar || prev.customerAadhar || ''),
       vehicleModel: vModel,
       vehicleColor: vColor,
       exShowroom: basePrice,
@@ -774,6 +806,7 @@ export default function LeadsManagement({
       batteryNumber: '',
       chargerNumber: '',
       controllerNumber: '',
+      hypothecation: '',
       paymentStatus: 'Fully Paid',
       notes: `Advance Booking #${b.id || ''} (₹${advanceAmt.toLocaleString('en-IN')} paid via ${b.paymentMode || 'Cash'})`
     }));
@@ -960,7 +993,7 @@ export default function LeadsManagement({
       name: lead.name || '',
       mobile: lead.mobile || '',
       email: lead.email || '',
-      aadhar: lead.aadhar || '',
+      aadhar: formatAadhar(lead.aadhar || ''),
       address: lead.address || '',
       sourceType: lead.sourceType || 'Walk-In',
       entryDate: parsedEntryDate,
@@ -1451,10 +1484,15 @@ export default function LeadsManagement({
                   <div className="invoice-container">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #059669', paddingBottom: '12px' }}>
                       <div>
-                        <div className="invoice-title" style={{ textAlign: 'left', margin: 0, fontSize: '1.25rem' }}>NANDHI MOTORS</div>
+                        <div className="invoice-title" style={{ textAlign: 'left', margin: 0, fontSize: '1.25rem' }}>{effectiveCompanyProfile.name || 'NANDHI MOTORS'}</div>
                         <p style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 600, margin: '2px 0 0' }}>
                           Customer Sales Lead Sheet
                         </p>
+                        {effectiveCompanyProfile.address && (
+                          <p style={{ fontSize: '0.72rem', color: '#6b7280', margin: '2px 0 0' }}>
+                            {effectiveCompanyProfile.address}
+                          </p>
+                        )}
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <span className="badge" style={{
@@ -1481,7 +1519,7 @@ export default function LeadsManagement({
                         <p><strong>Mobile:</strong> <a href={`tel:${generatedLead.mobile}`} style={{ color: '#059669', fontWeight: 600, textDecoration: 'none' }}>{generatedLead.mobile}</a></p>
                         {generatedLead.email && <p><strong>Email:</strong> {generatedLead.email}</p>}
                         {generatedLead.address && <p><strong>Address:</strong> {generatedLead.address}</p>}
-                        {generatedLead.aadhar && <p><strong>Aadhaar:</strong> {generatedLead.aadhar}</p>}
+                        {generatedLead.aadhar && <p><strong>Aadhaar:</strong> {formatAadhar(generatedLead.aadhar)}</p>}
                         <p><strong>Enquiry Source:</strong> {generatedLead.sourceType || 'Walk-In'}</p>
                       </div>
 
@@ -1784,13 +1822,13 @@ export default function LeadsManagement({
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #059669', paddingBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                         <div>
                           <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#111827', letterSpacing: '-0.5px' }}>
-                            NANDHI MOTORS
+                            {effectiveCompanyProfile.name || 'NANDHI MOTORS'}
                           </div>
                           <div style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                            Authorized Two-Wheeler Sales & Service
+                            {effectiveCompanyProfile.tagline || 'Authorized Two-Wheeler Sales & Service'}
                           </div>
                           <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>
-                            128, Bangalore Main Road, Hosur - 635109 | 📞 +91 98421 55670
+                            {effectiveCompanyProfile.address} | 📞 {[effectiveCompanyProfile.phone, effectiveCompanyProfile.altPhone].filter(Boolean).join(' / ')}
                           </div>
                         </div>
 
@@ -1833,7 +1871,7 @@ export default function LeadsManagement({
                           )}
                           {(generatedQuote.customerAadhar || generatedQuote.customerGst) && (
                             <div style={{ fontSize: '0.74rem', color: '#6b7280', marginTop: '3px' }}>
-                              {generatedQuote.customerAadhar && <span>Aadhar: <strong>{generatedQuote.customerAadhar}</strong> </span>}
+                              {generatedQuote.customerAadhar && <span>Aadhar: <strong>{formatAadhar(generatedQuote.customerAadhar)}</strong> </span>}
                               {generatedQuote.customerGst && <span>| GSTIN: <strong>{generatedQuote.customerGst}</strong></span>}
                             </div>
                           )}
@@ -1963,7 +2001,7 @@ export default function LeadsManagement({
                           </span>
                         </div>
                         <div style={{ whiteSpace: 'pre-wrap', color: '#374151', fontSize: '0.75rem', lineHeight: 1.5 }}>
-                          {companyProfile?.quotationTerms || `1. Prices quoted are valid for 7 days from the date of issuance and subject to manufacturer price revisions.
+                          {effectiveCompanyProfile?.quotationTerms || `1. Prices quoted are valid for 7 days from the date of issuance and subject to manufacturer price revisions.
 2. Final delivery is subject to availability of vehicle stock and color chosen at the time of final booking.
 3. RTO registration, road tax, and insurance charges are subject to statutory revisions by Government authorities.
 4. Full on-road payment is required prior to vehicle invoicing and registration dispatch.
@@ -2312,12 +2350,12 @@ export default function LeadsManagement({
                 {generatedBooking ? (
                   <div className="invoice-container">
                     {/* Header */}
-                    <div className="invoice-title">NANDHI MOTORS</div>
+                    <div className="invoice-title">{effectiveCompanyProfile.name || 'NANDHI MOTORS'}</div>
                     <p style={{ textAlign: 'center', fontSize: '0.72rem', color: '#6b7280', marginBottom: '4px' }}>
-                      128, Bangalore Main Road, Hosur - 635109
+                      {effectiveCompanyProfile.address}
                     </p>
                     <p style={{ textAlign: 'center', fontSize: '0.72rem', color: '#6b7280', marginBottom: '18px' }}>
-                      Ph: 04344-000000 | GSTIN: 33XXXXX0000X1ZX
+                      Ph: {[effectiveCompanyProfile.phone, effectiveCompanyProfile.altPhone].filter(Boolean).join(' / ')} {effectiveCompanyProfile.gstin ? `| GSTIN: ${effectiveCompanyProfile.gstin}` : ''}
                     </p>
 
                     <div style={{
@@ -2386,7 +2424,7 @@ export default function LeadsManagement({
 
                     <div style={{ marginTop: '28px', borderTop: '1px dashed #ccc', paddingTop: '12px', fontSize: '0.75rem', color: '#9ca3af', textAlign: 'center' }}>
                       This is a computer-generated booking receipt. Signature not required.<br />
-                      Thank you for choosing Nandhi Motors!
+                      Thank you for choosing {effectiveCompanyProfile.name || 'Nandhi Motors'}!
                     </div>
 
                     <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
@@ -2724,10 +2762,10 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      
-                      pattern="[0-9]{12}"
-                      maxLength={12} pattern="[0-9]{12}" value={invoiceFormData.customerAadhar}
-                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerAadhar: e.target.value })}
+                      placeholder="XXXX XXXX XXXX"
+                      maxLength={14}
+                      value={invoiceFormData.customerAadhar}
+                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, customerAadhar: formatAadhar(e.target.value) })}
                     />
                   </div>
                   <div className="form-group">
@@ -2852,6 +2890,16 @@ export default function LeadsManagement({
                   </div>
                 </div>
                 <div className="form-group">
+                  <label className="form-label">Hypothecation / Finance (Optional)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Enter finance company / hypothecation details"
+                    value={invoiceFormData.hypothecation || ''}
+                    onChange={(e) => setInvoiceFormData({ ...invoiceFormData, hypothecation: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
                   <label className="form-label">Warranty Details</label>
                   <input
                     type="text"
@@ -2903,38 +2951,6 @@ export default function LeadsManagement({
                 </div>
                 <div className="form-grid">
                   <div className="form-group">
-                    <label className="form-label">RTO Registration Charges (₹)</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className="form-control"
-                      value={invoiceFormData.rto}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '' || /^\d*$/.test(val)) {
-                          setInvoiceFormData({ ...invoiceFormData, rto: val });
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Comprehensive Insurance (₹)</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className="form-control"
-                      value={invoiceFormData.insurance}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '' || /^\d*$/.test(val)) {
-                          setInvoiceFormData({ ...invoiceFormData, insurance: val });
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-                <div className="form-grid">
-                  <div className="form-group">
                     <label className="form-label">Subsidy Amount (₹)</label>
                     <input
                       type="text"
@@ -2965,21 +2981,6 @@ export default function LeadsManagement({
                         }
                       }}
                     />
-                  </div>
-                </div>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label className="form-label">Payment Status *</label>
-                    <select
-                      className="form-control"
-                      required
-                      value={invoiceFormData.paymentStatus}
-                      onChange={(e) => setInvoiceFormData({ ...invoiceFormData, paymentStatus: e.target.value })}
-                    >
-                      <option value="Fully Paid">Fully Paid</option>
-                      <option value="Partially Paid">Partially Paid</option>
-                      <option value="Unpaid">Unpaid</option>
-                    </select>
                   </div>
                 </div>
               </div>
@@ -3183,10 +3184,11 @@ export default function LeadsManagement({
                   <div className="invoice-container">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
-                        <div className="invoice-title" style={{ textAlign: 'left', margin: 0 }}>NANDHI MOTORS</div>
+                        <div className="invoice-title" style={{ textAlign: 'left', margin: 0 }}>{effectiveCompanyProfile.name || 'NANDHI MOTORS'}</div>
                         <p style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '2px' }}>
-                          128, Bangalore Main Road, Hosur - 635109<br />
-                          GSTIN: 33XXXXX0000X1ZX
+                          {effectiveCompanyProfile.address}<br />
+                          {effectiveCompanyProfile.gstin && <>GSTIN: {effectiveCompanyProfile.gstin}<br /></>}
+                          Ph: {[effectiveCompanyProfile.phone, effectiveCompanyProfile.altPhone].filter(Boolean).join(' / ')}
                         </p>
                       </div>
                       <div style={{ textAlign: 'right' }}>
@@ -3213,7 +3215,7 @@ export default function LeadsManagement({
                         Name: {generatedInvoice.customerName}<br />
                         Phone: {generatedInvoice.customerPhone}<br />
                         Address: {generatedInvoice.customerAddress || 'N/A'}<br />
-                        {generatedInvoice.customerAadhar && <>Aadhar: {generatedInvoice.customerAadhar}<br /></>}
+                        {generatedInvoice.customerAadhar && <>Aadhar: {formatAadhar(generatedInvoice.customerAadhar)}<br /></>}
                         {generatedInvoice.customerGst && <>Customer GST: {generatedInvoice.customerGst}<br /></>}
                       </div>
                       <div>
@@ -3224,6 +3226,7 @@ export default function LeadsManagement({
                         Battery: {generatedInvoice.batteryNo || 'N/A'}<br />
                         Charger: {generatedInvoice.chargerNo || 'N/A'}<br />
                         Controller: {generatedInvoice.controllerNo || 'N/A'}
+                        {generatedInvoice.hypothecation && <><br />Finance / Hypothecation: {generatedInvoice.hypothecation}</>}
                       </div>
                     </div>
 
@@ -3253,47 +3256,7 @@ export default function LeadsManagement({
                           <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹{Number(generatedInvoice.gstTax || 0).toLocaleString('en-IN')}</td>
                           <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹{Number(generatedInvoice.totalWithGst || 0).toLocaleString('en-IN')}</td>
                         </tr>
-                        {Number(generatedInvoice.insurance || 0) > 0 && (
-                          <tr style={{ borderBottom: '1px dotted #ccc' }}>
-                            <td style={{ padding: '4px 6px' }}>Comprehensive Insurance</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>1</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹{Number(generatedInvoice.insurance).toLocaleString('en-IN')}</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>0%</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹0</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹{Number(generatedInvoice.insurance).toLocaleString('en-IN')}</td>
-                          </tr>
-                        )}
-                        {Number(generatedInvoice.rto || 0) > 0 && (
-                          <tr style={{ borderBottom: '1px dotted #ccc' }}>
-                            <td style={{ padding: '4px 6px' }}>RTO Registration & Plate Charges</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>1</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹{Number(generatedInvoice.rto).toLocaleString('en-IN')}</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>0%</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹0</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹{Number(generatedInvoice.rto).toLocaleString('en-IN')}</td>
-                          </tr>
-                        )}
-                        {Number(generatedInvoice.handlingCharges || 0) > 0 && (
-                          <tr style={{ borderBottom: '1px dotted #ccc' }}>
-                            <td style={{ padding: '4px 6px' }}>Logistics & Showroom Handling Fees</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>1</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹{Number(generatedInvoice.handlingCharges).toLocaleString('en-IN')}</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>0%</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹0</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹{Number(generatedInvoice.handlingCharges).toLocaleString('en-IN')}</td>
-                          </tr>
-                        )}
-                        {Number(generatedInvoice.accessoriesPrice || 0) > 0 && (
-                          <tr style={{ borderBottom: '1px dotted #ccc' }}>
-                            <td style={{ padding: '4px 6px' }}>Showroom Accessories Kit</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>1</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹{Number(generatedInvoice.accessoriesPrice).toLocaleString('en-IN')}</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>0%</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹0</td>
-                            <td style={{ textAlign: 'right', padding: '4px 6px' }}>₹{Number(generatedInvoice.accessoriesPrice).toLocaleString('en-IN')}</td>
-                          </tr>
-                        )}
-                        {Number(generatedInvoice.subsidyDiscount || 0) > 0 && (
+                            {Number(generatedInvoice.subsidyDiscount || 0) > 0 && (
                           <tr style={{ color: '#ef4444', borderBottom: '1px dotted #ccc' }}>
                             <td style={{ padding: '4px 6px' }}>FAME-II Govt Subsidy Credit (-)</td>
                             <td style={{ textAlign: 'right', padding: '4px 6px' }}>1</td>
@@ -3343,7 +3306,7 @@ export default function LeadsManagement({
                         Terms & Conditions
                       </strong>
                       <div style={{ whiteSpace: 'pre-wrap' }}>
-                        {companyProfile?.invoiceTerms || `1. Goods once sold will not be taken back or exchanged.
+                        {effectiveCompanyProfile?.invoiceTerms || `1. Goods once sold will not be taken back or exchanged.
 2. Warranty is subject to manufacturer's policy and applies from the date of this invoice.
 3. Dealership is not liable for indirect damages or delays beyond our control.
 4. All disputes are subject to local city jurisdiction only.
@@ -3516,10 +3479,10 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      
-                      maxLength="14"
-                      maxLength={12} pattern="[0-9]{12}" value={leadFormData.aadhar}
-                      onChange={(e) => setLeadFormData({ ...leadFormData, aadhar: e.target.value })}
+                      placeholder="XXXX XXXX XXXX"
+                      maxLength={14}
+                      value={leadFormData.aadhar}
+                      onChange={(e) => setLeadFormData({ ...leadFormData, aadhar: formatAadhar(e.target.value) })}
                     />
                   </div>
                   <div className="form-group">
@@ -4021,10 +3984,10 @@ export default function LeadsManagement({
                     <input
                       type="text"
                       className="form-control"
-                      
-                      maxLength="14"
-                      maxLength={12} pattern="[0-9]{12}" value={quoteFormData.customerAadhar}
-                      onChange={(e) => setQuoteFormData({ ...quoteFormData, customerAadhar: e.target.value })}
+                      placeholder="XXXX XXXX XXXX"
+                      maxLength={14}
+                      value={quoteFormData.customerAadhar}
+                      onChange={(e) => setQuoteFormData({ ...quoteFormData, customerAadhar: formatAadhar(e.target.value) })}
                     />
                   </div>
                   {/* Customer GSTIN */}
@@ -4467,7 +4430,7 @@ export default function LeadsManagement({
         onClose={() => setPrintModalConfig(prev => ({ ...prev, isOpen: false }))}
         type={printModalConfig.type}
         data={printModalConfig.data}
-        companyProfile={companyProfile}
+        companyProfile={effectiveCompanyProfile}
         onConvertQuoteToInvoice={(q) => {
           setPrintModalConfig(prev => ({ ...prev, isOpen: false }));
           handleConvertQuoteToInvoice(q);

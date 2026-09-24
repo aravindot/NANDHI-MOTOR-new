@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Printer, X, Download, Check, ShieldCheck, Wrench, FileText, ShoppingCart, Award, MessageCircle, FileDown, Receipt } from 'lucide-react';
 import { generateInvoicePdfAndShare, generateQuotationPdfAndShare, buildTaxInvoicePdf, buildQuotationPdf } from '../utils/pdfShareUtil';
+import { getPrintTheme, readPrintSettingsFromStorage, openThemePrintWindow, buildPrintThemeCss } from '../utils/printSettings';
+import { formatAadhar } from '../utils/formatUtils';
 
 export default function PrintPreviewModal({
   isOpen,
@@ -14,45 +16,74 @@ export default function PrintPreviewModal({
   const docRef = useRef(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
+  const savedSettings = React.useMemo(() => {
+    const baseSettings = propProfile?.printSettings || readPrintSettingsFromStorage();
+    return baseSettings && Object.keys(baseSettings).length ? baseSettings : readPrintSettingsFromStorage();
+  }, [propProfile, isOpen]);
+
+  const printSettings = React.useMemo(() => {
+    return savedSettings || readPrintSettingsFromStorage();
+  }, [savedSettings]);
+
+  const theme = React.useMemo(() => getPrintTheme(printSettings, type), [printSettings, type]);
+
   const profile = React.useMemo(() => {
-    if (propProfile) return propProfile;
+    if (propProfile && propProfile.name) return propProfile;
     try {
       const primary = localStorage.getItem('nandhi_app_company_profile');
-      if (primary) return JSON.parse(primary);
+      if (primary) {
+        const parsed = JSON.parse(primary);
+        if (parsed && parsed.name) return parsed;
+      }
       const legacy = localStorage.getItem('nandhi_company_profile');
-      if (legacy) return JSON.parse(legacy);
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        if (parsed && parsed.name) return parsed;
+      }
     } catch (e) {}
     return {
       name: 'NANDHI MOTORS',
       tagline: 'Authorized Two-Wheeler Sales, Genuine Spares & Service Dealership',
-      address: 'No. 12, Palani Main Road, Palani, Dindigul, Tamil Nadu - 624601',
-      phone: '+91 98421 55670',
-      email: 'contact@nandhimotors.com',
+      address: '170/2, ITTERI ROAD, PALANI-624601',
+      phone: '+91 7604857272',
+      altPhone: '+91 7604847272',
+      email: 'nandhimotorspalani@gmail.com',
       website: 'www.nandhimotors.com',
-      gstin: '33AABCN1234F1Z9',
+      gstin: '33BCXPA4714R1Z2',
       state: 'Tamil Nadu (33)',
-      bankName: 'HDFC Bank',
+      bankName: 'IDBI BANK',
       accountName: 'NANDHI MOTORS',
-      accountNumber: '50200088991234',
-      ifscCode: 'HDFC0001234',
-      branch: 'Namakkal Main Branch',
+      accountNumber: '0920102000007825',
+      ifscCode: 'IBKL0000920',
+      branch: 'PALANI BRANCH',
       upiId: 'nandhimotors@hdfcbank'
     };
   }, [propProfile, isOpen]);
 
+  const companyPhones = [profile.phone, profile.altPhone].filter(Boolean).join(' / ');
+  const accentColor = theme.primary;
+  const secondaryColor = theme.secondary;
+  const softFill = theme.soft;
+
   if (!isOpen || !data) return null;
 
+  const hypothecation = data.hypothecation || data.finance || data.financier || data.hypothecationDetails || '';
+
   const handlePrint = () => {
-    window.print();
+    if (docRef.current) {
+      openThemePrintWindow('Print Document', docRef.current.innerHTML, printSettings, type);
+    } else {
+      window.print();
+    }
   };
 
   const handleWhatsAppShare = async () => {
     setIsGeneratingPdf(true);
     try {
       if (type === 'quotation') {
-        await generateQuotationPdfAndShare(data, profile);
+        await generateQuotationPdfAndShare(data, profile, false, printSettings, type);
       } else {
-        await generateInvoicePdfAndShare(data, profile);
+        await generateInvoicePdfAndShare(data, profile, false, printSettings, type);
       }
     } finally {
       setIsGeneratingPdf(false);
@@ -63,9 +94,9 @@ export default function PrintPreviewModal({
     setIsGeneratingPdf(true);
     try {
       if (type === 'quotation') {
-        await generateQuotationPdfAndShare(data, profile, true);
+        await generateQuotationPdfAndShare(data, profile, true, printSettings, type);
       } else {
-        await generateInvoicePdfAndShare(data, profile, true);
+        await generateInvoicePdfAndShare(data, profile, true, printSettings, type);
       }
     } finally {
       setIsGeneratingPdf(false);
@@ -75,6 +106,7 @@ export default function PrintPreviewModal({
   return (
     <div className="print-modal-overlay">
       <style>{`
+        ${buildPrintThemeCss(printSettings, type)}
         .print-modal-overlay {
           position: fixed;
           top: 0;
@@ -142,12 +174,12 @@ export default function PrintPreviewModal({
           border-radius: 6px;
         }
         .print-modal-body::-webkit-scrollbar-thumb {
-          background: #059669;
+          background: ${accentColor};
           border-radius: 6px;
           border: 2px solid #f1f5f9;
         }
         .print-modal-body::-webkit-scrollbar-thumb:hover {
-          background: #047857;
+          background: ${secondaryColor};
         }
 
         .print-modal-footer-bar {
@@ -181,7 +213,7 @@ export default function PrintPreviewModal({
           margin: 0;
           font-size: 24px;
           font-weight: 800;
-          color: #059669;
+          color: ${theme.primary};
           letter-spacing: 0.5px;
         }
 
@@ -194,7 +226,7 @@ export default function PrintPreviewModal({
         .doc-badge-title {
           display: inline-block;
           margin-top: 10px;
-          background-color: #111827;
+          background-color: ${theme.secondary};
           color: #ffffff;
           padding: 4px 16px;
           font-weight: 700;
@@ -304,7 +336,7 @@ export default function PrintPreviewModal({
         {/* Top Sticky Control Header */}
         <div className="print-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Printer size={20} style={{ color: '#10b981' }} />
+            <Printer size={20} style={{ color: accentColor }} />
             <div>
               <div style={{ fontWeight: 700, fontSize: '1rem' }}>
                 Print Preview &bull; {type === 'invoice' ? 'Tax Invoice' : type === 'quotation' ? 'Quotation' : type === 'booking' ? 'Booking Confirmation' : type === 'jobsheet' ? 'Job Card' : type === 'purchase' ? 'Purchase Voucher' : type === 'warranty' ? 'Warranty Claim Voucher' : 'Service Bill'}
@@ -321,7 +353,7 @@ export default function PrintPreviewModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#059669',
+                backgroundColor: accentColor,
                 color: '#ffffff',
                 border: 'none',
                 width: '38px',
@@ -346,7 +378,7 @@ export default function PrintPreviewModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#059669',
+                backgroundColor: accentColor,
                 color: '#ffffff',
                 border: 'none',
                 width: '38px',
@@ -370,7 +402,7 @@ export default function PrintPreviewModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#059669',
+                backgroundColor: accentColor,
                 color: '#ffffff',
                 border: 'none',
                 width: '38px',
@@ -394,7 +426,7 @@ export default function PrintPreviewModal({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#047857',
+                  backgroundColor: secondaryColor,
                   color: '#ffffff',
                   border: 'none',
                   width: '38px',
@@ -419,7 +451,7 @@ export default function PrintPreviewModal({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#047857',
+                  backgroundColor: secondaryColor,
                   color: '#ffffff',
                   border: 'none',
                   width: '38px',
@@ -462,14 +494,16 @@ export default function PrintPreviewModal({
 
         {/* Modal Printable Paper Body with Dedicated Scroll */}
         <div id="print-scroll-container" className="print-modal-body">
-          <div ref={docRef} className="doc-paper">
+          <div ref={docRef} className={`doc-paper print-style-${theme.style || 'classic'}`}>
             {/* Header Title */}
             <div className="doc-header-banner">
-              <h1>{profile.name}</h1>
-              <p>{profile.tagline}</p>
-              <p style={{ fontSize: '11px', color: '#6b7280' }}>
-                {profile.address} | Phone: {profile.phone} | GSTIN: {profile.gstin}
-              </p>
+              <div>
+                <h1>{profile.name}</h1>
+                <p>{profile.tagline}</p>
+                <p style={{ fontSize: '11px', color: '#6b7280' }}>
+                  {profile.address} | Phone: {companyPhones} | GSTIN: {profile.gstin}
+                </p>
+              </div>
               <div className="doc-badge-title">
                 {type === 'invoice' && 'TAX INVOICE'}
                 {type === 'quotation' && 'OFFICIAL PRICE QUOTATION'}
@@ -485,33 +519,14 @@ export default function PrintPreviewModal({
             {type === 'invoice' && (
               <div>
                 {/* Top Invoice Header Badges */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #e5e7eb', paddingBottom: '8px' }}>
-                  <div>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151' }}>
-                      Invoice No: <span style={{ fontFamily: 'monospace', color: '#059669', fontSize: '1rem' }}>#{data.invoiceNo || '01'}</span>
-                    </span>
-                    <span style={{ margin: '0 8px', color: '#d1d5db' }}>|</span>
-                    <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                      Date: <strong>{data.invoiceDate || data.createdOn || new Date().toLocaleDateString('en-IN')}</strong>
-                    </span>
-                  </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #e5e7eb', paddingBottom: '8px', gap: '12px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151' }}>
+                    Invoice No: <span style={{ fontFamily: 'monospace', color: accentColor, fontSize: '1rem' }}>#{data.invoiceNo || '01'}</span>
+                  </span>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                      backgroundColor: data.paymentStatus === 'Fully Paid' ? '#ecfdf5' : data.paymentStatus === 'Partially Paid' ? '#fffbeb' : '#fef2f2',
-                      color: data.paymentStatus === 'Fully Paid' ? '#047857' : data.paymentStatus === 'Partially Paid' ? '#b45309' : '#b91c1c',
-                      padding: '3px 10px',
-                      borderRadius: '12px',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      border: '1px solid'
-                    }}>
-                      Payment Status: {data.paymentStatus || 'Fully Paid'}
-                    </span>
-                    <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                      State Code: <strong>33 (Tamil Nadu)</strong>
-                    </span>
-                  </div>
+                  <span style={{ fontSize: '0.8rem', color: '#6b7280', textAlign: 'right' }}>
+                    Date: <strong>{data.invoiceDate || data.createdOn || new Date().toLocaleDateString('en-IN')}</strong>
+                  </span>
                 </div>
 
                 {/* 2-Column Customer & Vehicle Identity */}
@@ -519,32 +534,32 @@ export default function PrintPreviewModal({
                   
                   {/* Left Column: Customer Bill To Details */}
                   <div style={{ backgroundColor: '#f9fafb', padding: '10px 12px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
-                      Buyer / Customer Details (Bill To)
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: accentColor, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
+                      Customer Details
                     </div>
-                    <p style={{ margin: '2px 0' }}><strong>Customer Name:</strong> {data.customerName || 'N/A'}</p>
-                    <p style={{ margin: '2px 0' }}><strong>Mobile Number:</strong> {data.customerPhone || data.customerMobile || 'N/A'}</p>
-                    <p style={{ margin: '2px 0' }}><strong>Billing Address:</strong> {data.customerAddress || 'Showroom Direct Delivery'}</p>
-                    <p style={{ margin: '2px 0' }}><strong>Aadhaar Number:</strong> {data.customerAadhar || 'N/A (Verified)'}</p>
+                    <p style={{ margin: '2px 0' }}><strong>Customer Name:</strong> {data.customerName || data.name || 'N/A'}</p>
+                    <p style={{ margin: '2px 0' }}><strong>Mobile Number:</strong> {data.customerPhone || data.customerMobile || data.mobile || 'N/A'}</p>
+                    <p style={{ margin: '2px 0' }}><strong>Billing Address:</strong> {data.customerAddress || data.address || 'Showroom Direct Delivery'}</p>
+                    <p style={{ margin: '2px 0' }}><strong>Aadhaar Number:</strong> {formatAadhar(data.customerAadhar) || data.customerAadhar || 'N/A (Verified)'}</p>
                     {data.customerGst && <p style={{ margin: '2px 0' }}><strong>Customer GSTIN:</strong> <span style={{ fontFamily: 'monospace' }}>{data.customerGst}</span></p>}
                   </div>
 
                   {/* Right Column: Vehicle Technical & Serial Numbers */}
                   <div style={{ backgroundColor: '#f9fafb', padding: '10px 12px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
-                      Vehicle Specifications & Serial Nos
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: secondaryColor, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
+                      Vehicle Specifications
                     </div>
-                    <p style={{ margin: '2px 0' }}><strong>Model & Variant:</strong> {data.vehicleModel || ''}</p>
-                    <p style={{ margin: '2px 0' }}><strong>Color / Shade:</strong> {data.vehicleColor || 'Standard'}</p>
-                    <p style={{ margin: '2px 0' }}><strong>Chassis / VIN No:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{data.vinNumber || data.vin || data.chassisNo || 'ME4JF911NK00892'}</span></p>
-                    <p style={{ margin: '2px 0' }}><strong>Motor / Engine No:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{data.engineNo || data.motorNumber || 'JF91E918231'}</span></p>
+                    <p style={{ margin: '2px 0' }}><strong>Color:</strong> {data.vehicleColor || 'Standard'}</p>
+                    <p style={{ margin: '2px 0' }}><strong>VIN No:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{data.vinNumber || data.vin || data.chassisNo || 'ME4JF911NK00892'}</span></p>
+                    <p style={{ margin: '2px 0' }}><strong>Motor No:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{data.engineNo || data.motorNumber || 'JF91E918231'}</span></p>
                     <p style={{ margin: '2px 0' }}><strong>Battery Serial No:</strong> {data.batteryNumber || data.batteryNo || 'BAT-2026-NANDHI'}</p>
                     <p style={{ margin: '2px 0' }}><strong>Charger / Controller:</strong> {data.chargerNumber || data.chargerNo || 'CHG-9921'} / {data.controllerNumber || data.controllerNo || 'CTRL-8812'}</p>
+                    {hypothecation && <p style={{ margin: '2px 0' }}><strong>Finance / Hypothecation:</strong> {hypothecation}</p>}
                   </div>
                 </div>
 
                 {/* Warranty Coverage Banner */}
-                <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', padding: '6px 12px', borderRadius: '4px', fontSize: '0.75rem', color: '#047857', marginBottom: '12px' }}>
+                <div style={{ backgroundColor: softFill, border: `1px solid ${theme.accent}`, padding: '6px 12px', borderRadius: '4px', fontSize: '0.75rem', color: accentColor, marginBottom: '12px' }}>
                   <strong>Warranty Coverage:</strong> {data.warrantyDetails || '3 Years or 40,000 KMs for Motor, Controller, Cluster & Battery (Whichever is earlier)'}
                 </div>
 
@@ -553,7 +568,7 @@ export default function PrintPreviewModal({
                   <thead>
                     <tr>
                       <th style={{ width: '40px' }}>Sl.</th>
-                      <th>Description of Goods / Vehicle Supply</th>
+                      <th>Description</th>
                       <th style={{ width: '80px', textAlign: 'center' }}>HSN/SAC</th>
                       <th style={{ width: '45px', textAlign: 'center' }}>Qty</th>
                       <th style={{ textAlign: 'right' }}>Taxable Value (₹)</th>
@@ -567,46 +582,17 @@ export default function PrintPreviewModal({
                       <td>1</td>
                       <td>
                         <strong>{data.vehicleModel}</strong> ({data.vehicleColor})
-                        <div style={{ fontSize: '9px', color: '#6b7280' }}>
-                          VIN: {data.vinNumber || data.vin || data.chassisNo || 'Standard OEM Supply'}
-                        </div>
                       </td>
                       <td style={{ textAlign: 'center' }}>87112029</td>
                       <td style={{ textAlign: 'center' }}>1</td>
                       <td style={{ textAlign: 'right' }}>₹{Number(data.exShowroom || (data.grandTotal * 0.78) || 75000).toLocaleString('en-IN')}</td>
                       <td style={{ textAlign: 'center' }}>{data.gstRate || 5}%</td>
                       <td style={{ textAlign: 'right' }}>₹{Number(data.gstAmount || Math.round(Number(data.exShowroom || 75000) * ((data.gstRate || 5) / 100))).toLocaleString('en-IN')}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>₹{(Number(data.exShowroom || 75000) + Number(data.gstAmount || Math.round(Number(data.exShowroom || 75000) * ((data.gstRate || 5) / 100)))).toLocaleString('en-IN')}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600, color: accentColor }}>₹{(Number(data.exShowroom || 75000) + Number(data.gstAmount || Math.round(Number(data.exShowroom || 75000) * ((data.gstRate || 5) / 100)))).toLocaleString('en-IN')}</td>
                     </tr>
 
-                    {Number(data.insurance || data.insuranceCharges || 0) > 0 && (
-                      <tr>
-                        <td>2</td>
-                        <td>Comprehensive Vehicle Insurance (1 Yr Own Damage + 5 Yr Third Party)</td>
-                        <td style={{ textAlign: 'center' }}>9971</td>
-                        <td style={{ textAlign: 'center' }}>1</td>
-                        <td style={{ textAlign: 'right' }}>₹{Number(data.insurance || data.insuranceCharges).toLocaleString('en-IN')}</td>
-                        <td style={{ textAlign: 'center' }}>Exempt</td>
-                        <td style={{ textAlign: 'right' }}>₹0</td>
-                        <td style={{ textAlign: 'right' }}>₹{Number(data.insurance || data.insuranceCharges).toLocaleString('en-IN')}</td>
-                      </tr>
-                    )}
-
-                    {Number(data.rto || data.rtoCharges || 0) > 0 && (
-                      <tr>
-                        <td>3</td>
-                        <td>Life Tax, RTO Registration, Smart Card & High-Security Plates (HSRP)</td>
-                        <td style={{ textAlign: 'center' }}>9997</td>
-                        <td style={{ textAlign: 'center' }}>1</td>
-                        <td style={{ textAlign: 'right' }}>₹{Number(data.rto || data.rtoCharges).toLocaleString('en-IN')}</td>
-                        <td style={{ textAlign: 'center' }}>Exempt</td>
-                        <td style={{ textAlign: 'right' }}>₹0</td>
-                        <td style={{ textAlign: 'right' }}>₹{Number(data.rto || data.rtoCharges).toLocaleString('en-IN')}</td>
-                      </tr>
-                    )}
-
                     {Number(data.subsidy || 0) > 0 && (
-                      <tr style={{ color: '#059669', backgroundColor: '#f0fdf4' }}>
+                      <tr style={{ color: accentColor, backgroundColor: softFill }}>
                         <td>4</td>
                         <td><strong>Government FAME-II / State EV Promotion Subsidy (-)</strong></td>
                         <td style={{ textAlign: 'center' }}>9999</td>
@@ -636,19 +622,8 @@ export default function PrintPreviewModal({
                 {/* Financial Summary & Roundoff */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', margin: '12px 0', gap: '20px' }}>
                   
-                  {/* Left: Bank Settlement & Payment Account */}
-                  <div style={{ flex: 1, backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', padding: '10px 14px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                    <div style={{ fontWeight: 700, color: '#111827', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Settlement & Bank Details
-                    </div>
-                    <div><strong>Bank:</strong> {profile.bankName} ({profile.branch})</div>
-                    <div><strong>A/C Name:</strong> {profile.accountName}</div>
-                    <div><strong>Account No:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{profile.accountNumber}</span></div>
-                    <div><strong>IFSC Code:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{profile.ifscCode}</span> | <strong>UPI:</strong> {profile.upiId}</div>
-                  </div>
-
                   {/* Right: Totals Box */}
-                  <div style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.825rem' }}>
+                  <div style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.825rem', marginLeft: 'auto' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
                       <span style={{ color: '#6b7280' }}>Sub Total (Ex-Showroom):</span>
                       <span style={{ fontWeight: 600 }}>₹{Number(data.exShowroom || (data.grandTotal * 0.78) || 0).toLocaleString('en-IN')}</span>
@@ -659,22 +634,8 @@ export default function PrintPreviewModal({
                       <span style={{ fontWeight: 600 }}>₹{Number(data.gstAmount || Math.round(Number(data.exShowroom || 0) * 0.05)).toLocaleString('en-IN')}</span>
                     </div>
 
-                    {Number(data.insurance || data.insuranceCharges || 0) > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                        <span style={{ color: '#6b7280' }}>Insurance:</span>
-                        <span>₹{Number(data.insurance || data.insuranceCharges).toLocaleString('en-IN')}</span>
-                      </div>
-                    )}
-
-                    {Number(data.rto || data.rtoCharges || 0) > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                        <span style={{ color: '#6b7280' }}>RTO & Road Tax:</span>
-                        <span>₹{Number(data.rto || data.rtoCharges).toLocaleString('en-IN')}</span>
-                      </div>
-                    )}
-
                     {Number(data.subsidy || 0) > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: '#059669', fontWeight: 600 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: accentColor, fontWeight: 600 }}>
                         <span>Subsidy Deduction:</span>
                         <span>-₹{Number(data.subsidy).toLocaleString('en-IN')}</span>
                       </div>
@@ -694,7 +655,7 @@ export default function PrintPreviewModal({
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '2px solid #111827', fontWeight: 800, fontSize: '1rem', color: '#059669', marginTop: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: `2px solid ${secondaryColor}`, fontWeight: 800, fontSize: '1rem', color: accentColor, marginTop: '4px' }}>
                       <span>Grand Total:</span>
                       <span>₹{Number(data.grandTotal || 0).toLocaleString('en-IN')}</span>
                     </div>
@@ -716,16 +677,6 @@ export default function PrintPreviewModal({
                 </div>
 
                 {/* Signature Block */}
-                <div className="doc-signatures" style={{ marginTop: '30px' }}>
-                  <div className="doc-sig-line">
-                    Customer Acceptance Signature<br />
-                    <span style={{ fontSize: '9px', fontWeight: 400, color: '#6b7280' }}>I accept vehicle in sound condition</span>
-                  </div>
-                  <div className="doc-sig-line">
-                    For <strong>{profile.name}</strong><br />
-                    <span style={{ fontSize: '9px', fontWeight: 400, color: '#6b7280' }}>Authorized Dealership Signatory</span>
-                  </div>
-                </div>
               </div>
             )}
 
@@ -734,13 +685,13 @@ export default function PrintPreviewModal({
               <div>
                 <div className="doc-grid-2">
                   <div>
-                    <p><strong>Quote ID:</strong> <span style={{ fontFamily: 'monospace', color: '#059669', fontWeight: 700 }}>#{data.quoteId || 'QT-01'}</span></p>
+                    <p><strong>Quote ID:</strong> <span style={{ fontFamily: 'monospace', color: accentColor, fontWeight: 700 }}>#{data.quoteId || 'QT-01'}</span></p>
                     <p><strong>Quote Date:</strong> {data.createdOn || new Date().toLocaleDateString('en-IN')}</p>
                     <p><strong>Customer Name:</strong> {data.customerName || 'Valued Customer'}</p>
-                    <p><strong>Mobile:</strong> {data.customerPhone || 'N/A'}</p>
-                    {data.customerAddress && <p><strong>Address:</strong> {data.customerAddress}</p>}
+                    <p><strong>Mobile:</strong> {data.customerPhone || data.mobile || 'N/A'}</p>
+                    {(data.customerAddress || data.address) && <p><strong>Address:</strong> {data.customerAddress || data.address}</p>}
                     {data.customerEmail && <p><strong>Email:</strong> {data.customerEmail}</p>}
-                    {data.customerAadhar && <p><strong>Aadhar:</strong> {data.customerAadhar}</p>}
+                    {data.customerAadhar && <p><strong>Aadhar:</strong> {formatAadhar(data.customerAadhar) || data.customerAadhar}</p>}
                     {data.customerGst && <p><strong>GSTIN:</strong> {data.customerGst}</p>}
                   </div>
                   <div>
@@ -766,7 +717,7 @@ export default function PrintPreviewModal({
                     {(Number(data.gstRate || 0) > 0 || Number(data.gstAmount || 0) > 0) && (
                       <tr>
                         <td>Applicable GST ({data.gstRate !== undefined ? data.gstRate : 5}%)</td>
-                        <td style={{ textAlign: 'right', fontWeight: 600, color: '#059669' }}>
+                        <td style={{ textAlign: 'right', fontWeight: 600, color: accentColor }}>
                           +₹{Number(data.gstAmount !== undefined ? data.gstAmount : Math.round(Number(data.exShowroom || 0) * ((data.gstRate !== undefined ? data.gstRate : 5) / 100))).toLocaleString('en-IN')}
                         </td>
                       </tr>
@@ -807,7 +758,7 @@ export default function PrintPreviewModal({
                 </table>
 
                 <div className="doc-total-box">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '320px', padding: '6px 0', borderTop: '2px solid #111827', fontWeight: 800, fontSize: '15px', color: '#059669' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '320px', padding: '6px 0', borderTop: '2px solid #111827', fontWeight: 800, fontSize: '15px', color: accentColor }}>
                     <span>Estimated On-Road Price:</span>
                     <span>₹{Number(data.total || 0).toLocaleString('en-IN')}</span>
                   </div>
@@ -824,7 +775,7 @@ export default function PrintPreviewModal({
                   lineHeight: 1.5,
                   color: '#4b5563'
                 }}>
-                  <div style={{ fontWeight: 700, color: '#059669', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '11px' }}>
+                  <div style={{ fontWeight: 700, color: accentColor, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '11px' }}>
                     Terms & Conditions:
                   </div>
                   <div style={{ whiteSpace: 'pre-wrap' }}>
@@ -848,10 +799,11 @@ export default function PrintPreviewModal({
               <div>
                 <div className="doc-grid-2">
                   <div>
-                    <p><strong>Booking Ref:</strong> <span style={{ fontFamily: 'monospace', color: '#059669', fontWeight: 700 }}>#{data.bookingId || 'BK-01'}</span></p>
+                    <p><strong>Booking Ref:</strong> <span style={{ fontFamily: 'monospace', color: accentColor, fontWeight: 700 }}>#{data.bookingId || 'BK-01'}</span></p>
                     <p><strong>Booking Date:</strong> {data.createdOn || new Date().toLocaleDateString('en-IN')}</p>
-                    <p><strong>Customer Name:</strong> {data.customerName}</p>
-                    <p><strong>Mobile:</strong> {data.customerPhone}</p>
+                    <p><strong>Customer Name:</strong> {data.customerName || data.name}</p>
+                    <p><strong>Mobile:</strong> {data.customerPhone || data.mobile}</p>
+                    {(data.customerAddress || data.address) && <p><strong>Address:</strong> {data.customerAddress || data.address}</p>}
                   </div>
                   <div>
                     <p><strong>Booked Vehicle:</strong> {data.vehicleModel}</p>
@@ -861,8 +813,8 @@ export default function PrintPreviewModal({
                 </div>
 
                 <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', padding: '16px', borderRadius: '6px', textAlign: 'center', margin: '20px 0' }}>
-                  <div style={{ fontSize: '12px', textTransform: 'uppercase', color: '#047857', fontWeight: 700 }}>Advance Booking Amount Received</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#059669', marginTop: '4px' }}>
+                  <div style={{ fontSize: '12px', textTransform: 'uppercase', color: secondaryColor, fontWeight: 700 }}>Advance Booking Amount Received</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: accentColor, marginTop: '4px' }}>
                     ₹{Number(data.advancePaid || 5000).toLocaleString('en-IN')}
                   </div>
                   <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
@@ -882,13 +834,13 @@ export default function PrintPreviewModal({
               <div>
                 <div className="doc-grid-2">
                   <div>
-                    <p><strong>Job Sheet ID:</strong> <span style={{ fontFamily: 'monospace', color: '#059669', fontWeight: 700 }}>{data.id || 'JS-01'}</span></p>
+                    <p><strong>Job Sheet ID:</strong> <span style={{ fontFamily: 'monospace', color: accentColor, fontWeight: 700 }}>{data.id || 'JS-01'}</span></p>
                     <p><strong>Customer Name:</strong> {data.customerName}</p>
                     <p><strong>Mobile:</strong> {data.customerMobile || data.mobile || 'N/A'}</p>
                     <p><strong>Service Date:</strong> {data.date || new Date().toLocaleDateString('en-IN')}</p>
                   </div>
                   <div>
-                    <p><strong>Vehicle Reg No:</strong> <span style={{ fontWeight: 700, color: '#059669' }}>{data.vehicleNo}</span></p>
+                    <p><strong>Vehicle Reg No:</strong> <span style={{ fontWeight: 700, color: accentColor, textTransform: 'uppercase' }}>{(data.vehicleNo || data.vehicleRegNo || '').toUpperCase()}</span></p>
                     <p><strong>Odometer (KM):</strong> {data.vehicleKm || data.odometerKm || '0'} KM</p>
                     <p><strong>Service Type:</strong> {data.serviceType || 'Paid Service'}</p>
                     <p><strong>Current Status:</strong> {data.status || 'In Progress'}</p>
@@ -914,9 +866,9 @@ export default function PrintPreviewModal({
               <div>
                 <div className="doc-grid-2">
                   <div>
-                    <p><strong>Service Bill No:</strong> <span style={{ fontFamily: 'monospace', color: '#059669', fontWeight: 700 }}>{data.id || 'SB-01'}</span></p>
+                    <p><strong>Service Bill No:</strong> <span style={{ fontFamily: 'monospace', color: accentColor, fontWeight: 700 }}>{data.id || 'SB-01'}</span></p>
                     <p><strong>Customer Name:</strong> {data.customerName}</p>
-                    <p><strong>Vehicle Reg No:</strong> <span style={{ fontWeight: 700 }}>{data.vehicleNo}</span></p>
+                    <p><strong>Vehicle Reg No:</strong> <span style={{ fontWeight: 700, textTransform: 'uppercase' }}>{(data.vehicleNo || data.vehicleRegNo || '').toUpperCase()}</span></p>
                   </div>
                   <div>
                     <p><strong>Bill Date:</strong> {data.date || new Date().toLocaleDateString('en-IN')}</p>
@@ -963,7 +915,7 @@ export default function PrintPreviewModal({
                     <span>GST (18% / 5%):</span>
                     <span>₹{Number(data.gst || 0).toLocaleString('en-IN')}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '280px', padding: '4px 0', borderTop: '2px solid #111827', fontWeight: 800, fontSize: '15px', color: '#059669' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '280px', padding: '4px 0', borderTop: '2px solid #111827', fontWeight: 800, fontSize: '15px', color: accentColor }}>
                     <span>Total Paid:</span>
                     <span>₹{Number(data.grandTotal || 0).toLocaleString('en-IN')}</span>
                   </div>
@@ -981,7 +933,7 @@ export default function PrintPreviewModal({
               <div>
                 <div className="doc-grid-2">
                   <div>
-                    <p><strong>Voucher No:</strong> <span style={{ fontFamily: 'monospace', color: '#059669', fontWeight: 700 }}>{data.id}</span></p>
+                    <p><strong>Voucher No:</strong> <span style={{ fontFamily: 'monospace', color: accentColor, fontWeight: 700 }}>{data.id}</span></p>
                     <p><strong>Supplier Name:</strong> {data.supplierName}</p>
                     <p><strong>Supplier GSTIN:</strong> {data.supplierGst || 'N/A'}</p>
                   </div>
@@ -1023,9 +975,9 @@ export default function PrintPreviewModal({
               <div>
                 <div className="doc-grid-2">
                   <div>
-                    <p><strong>Claim ID:</strong> <span style={{ fontFamily: 'monospace', color: '#059669', fontWeight: 700 }}>{data.id}</span></p>
+                    <p><strong>Claim ID:</strong> <span style={{ fontFamily: 'monospace', color: accentColor, fontWeight: 700 }}>{data.id}</span></p>
                     <p><strong>Customer Name:</strong> {data.customerName}</p>
-                    <p><strong>Vehicle Reg No:</strong> <span style={{ fontWeight: 700 }}>{data.vehicleRegNo}</span></p>
+                    <p><strong>Vehicle Reg No:</strong> <span style={{ fontWeight: 700, textTransform: 'uppercase' }}>{(data.vehicleRegNo || data.vehicleNo || '').toUpperCase()}</span></p>
                   </div>
                   <div>
                     <p><strong>Vehicle Model:</strong> {data.vehicleModel}</p>

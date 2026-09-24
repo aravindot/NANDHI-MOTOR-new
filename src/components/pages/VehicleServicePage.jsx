@@ -162,7 +162,7 @@ export default function VehicleServicePage({
       ...prev,
       customerName: cust.name || '',
       customerMobile: (cust.mobile || '').replace(/\D/g, '').slice(0, 10),
-      vehicleNo: matchedJS ? matchedJS.vehicleNo : prev.vehicleNo
+      vehicleNo: matchedJS ? (matchedJS.vehicleNo || '').toUpperCase() : (prev.vehicleNo || '').toUpperCase()
     }));
     setShowSuggestions(false);
   };
@@ -305,7 +305,7 @@ export default function VehicleServicePage({
       jobSheetId: js.id,
       customerName: js.customerName,
       customerMobile: js.customerMobile || '',
-      vehicleNo: js.vehicleNo,
+      vehicleNo: (js.vehicleNo || '').toUpperCase(),
       serviceType: js.serviceType,
       laborItems: [...laborItems],
       parts: [...billingParts],
@@ -624,8 +624,9 @@ export default function VehicleServicePage({
                                   backgroundColor: '#f3f4f6',
                                   padding: '2px 6px',
                                   borderRadius: '4px',
-                                  fontSize: '0.82rem'
-                                }}>{js.vehicleNo}</span>
+                                  fontSize: '0.82rem',
+                                  textTransform: 'uppercase'
+                                }}>{(js.vehicleNo || '').toUpperCase()}</span>
                               </td>
                               <td style={{ fontSize: '0.82rem' }}>{Number(js.vehicleKm || 0).toLocaleString('en-IN')} km</td>
                               <td>
@@ -801,8 +802,9 @@ export default function VehicleServicePage({
                             backgroundColor: '#f3f4f6',
                             padding: '1px 6px',
                             borderRadius: '4px',
-                            fontSize: '0.84rem'
-                          }}>{selectedJobSheet.vehicleNo}</span>
+                            fontSize: '0.84rem',
+                            textTransform: 'uppercase'
+                          }}>{(selectedJobSheet.vehicleNo || '').toUpperCase()}</span>
                         </div>
                         <div>
                           <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block' }}>KM Reading</label>
@@ -898,7 +900,7 @@ export default function VehicleServicePage({
                     .filter(js => js.billingStatus === 'Unbilled')
                     .map(js => (
                       <option key={js.id} value={js.id}>
-                        {js.id} - {js.customerName} ({js.vehicleNo})
+                        {js.id} - {js.customerName} ({(js.vehicleNo || '').toUpperCase()})
                       </option>
                     ))
                   }
@@ -1388,8 +1390,9 @@ export default function VehicleServicePage({
                             backgroundColor: '#f3f4f6',
                             padding: '2px 6px',
                             borderRadius: '4px',
-                            fontSize: '0.82rem'
-                          }}>{bill.vehicleNo}</span>
+                            fontSize: '0.82rem',
+                            textTransform: 'uppercase'
+                          }}>{(bill.vehicleNo || '').toUpperCase()}</span>
                         </td>
                         <td>
                           <span className={`badge ${bill.serviceType === 'Free Service' ? 'badge-success' : 'badge-primary'}`} style={{
@@ -1518,8 +1521,9 @@ export default function VehicleServicePage({
                     backgroundColor: '#e5e7eb',
                     padding: '2px 6px',
                     borderRadius: '4px',
-                    fontSize: '0.84rem'
-                  }}>{inspectedCustomer.vehicleNo || 'N/A'}</span>
+                    fontSize: '0.84rem',
+                    textTransform: 'uppercase'
+                  }}>{inspectedCustomer.vehicleNo ? inspectedCustomer.vehicleNo.toUpperCase() : 'N/A'}</span>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600, display: 'block' }}>Total Spend (Lifetime)</span>
@@ -1804,6 +1808,7 @@ export default function VehicleServicePage({
         onClose={() => setPrintModalConfig(prev => ({ ...prev, isOpen: false }))}
         type={printModalConfig.type}
         data={printModalConfig.data}
+        companyProfile={companyProfile}
       />
     </div>
   );

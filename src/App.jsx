@@ -17,6 +17,11 @@ import BirthdayWishesPage from './components/pages/BirthdayWishesPage';
 import RedeemPointsPage from './components/pages/RedeemPointsPage';
 import CompanyProfilePage from './components/pages/CompanyProfilePage';
 import { API_BASE_URL } from './config/api';
+import { isSessionExpired, refreshSessionExpiry as extendSessionExpiry } from './utils/sessionTimeout';
+import { DEFAULT_PRINT_SETTINGS, readPrintSettingsFromStorage, buildPrintThemeCss } from './utils/printSettings';
+
+const SESSION_KEY = 'nandhi_app_session';
+const SESSION_TIMEOUT_KEY = 'nandhi_app_session_expires_at';
 
 const APP_CREDENTIALS = {
   username: '9791537272',
@@ -36,7 +41,10 @@ const readLocalStorageJson = (key, fallback) => {
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     try {
-      return localStorage.getItem('nandhi_app_session') === 'true';
+      const loggedIn = localStorage.getItem(SESSION_KEY) === 'true';
+      if (!loggedIn) return false;
+      const expiresAt = Number(localStorage.getItem(SESSION_TIMEOUT_KEY) || 0);
+      return !isSessionExpired(expiresAt, Date.now());
     } catch (error) {
       return false;
     }
@@ -45,16 +53,74 @@ export default function App() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
 
+  const clearSessionExpiry = () => {
+    try {
+      localStorage.removeItem(SESSION_TIMEOUT_KEY);
+    } catch (error) {
+      console.warn('Unable to clear session expiry.', error);
+    }
+  };
+
+  const setSessionExpiry = () => {
+    const nextExpiry = extendSessionExpiry(Date.now());
+    localStorage.setItem(SESSION_TIMEOUT_KEY, String(nextExpiry));
+    return nextExpiry;
+  };
+
   useEffect(() => {
     try {
       if (isAuthenticated) {
-        localStorage.setItem('nandhi_app_session', 'true');
+        localStorage.setItem(SESSION_KEY, 'true');
+        setSessionExpiry();
       } else {
-        localStorage.removeItem('nandhi_app_session');
+        localStorage.removeItem(SESSION_KEY);
+        clearSessionExpiry();
       }
     } catch (error) {
       console.warn('Unable to persist login session.', error);
     }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+
+    const checkSession = () => {
+      const expiresAt = Number(localStorage.getItem(SESSION_TIMEOUT_KEY) || 0);
+      if (isSessionExpired(expiresAt, Date.now())) {
+        setIsAuthenticated(false);
+        setLoginForm({ username: '', password: '' });
+        setLoginError('');
+        clearSessionExpiry();
+      }
+    };
+
+    const timer = setInterval(checkSession, 30000);
+    return () => clearInterval(timer);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+
+    const keepAlive = () => {
+      const expiresAt = Number(localStorage.getItem(SESSION_TIMEOUT_KEY) || 0);
+      if (isSessionExpired(expiresAt, Date.now())) {
+        setIsAuthenticated(false);
+        setLoginForm({ username: '', password: '' });
+        setLoginError('');
+        clearSessionExpiry();
+        return;
+      }
+
+      localStorage.setItem(SESSION_TIMEOUT_KEY, String(extendSessionExpiry(Date.now())));
+    };
+
+    const events = ['click', 'keydown', 'mousemove', 'touchstart', 'scroll', 'pointerdown'];
+
+    events.forEach((eventName) => window.addEventListener(eventName, keepAlive, { passive: true }));
+
+    return () => {
+      events.forEach((eventName) => window.removeEventListener(eventName, keepAlive));
+    };
   }, [isAuthenticated]);
 
   const handleLogin = (event) => {
@@ -65,6 +131,8 @@ export default function App() {
     if (username === APP_CREDENTIALS.username && password === APP_CREDENTIALS.password) {
       setIsAuthenticated(true);
       setLoginError('');
+      localStorage.setItem(SESSION_KEY, 'true');
+      localStorage.setItem(SESSION_TIMEOUT_KEY, String(extendSessionExpiry(Date.now())));
       return;
     }
 
@@ -75,6 +143,8 @@ export default function App() {
     setIsAuthenticated(false);
     setLoginForm({ username: '', password: '' });
     setLoginError('');
+    clearSessionExpiry();
+    localStorage.removeItem(SESSION_KEY);
   };
 
   // Navigation State
@@ -162,19 +232,19 @@ export default function App() {
     return {
       name: 'NANDHI MOTORS',
       tagline: 'Authorized Two-Wheeler Sales, Genuine Spares & Service Dealership',
-      address: 'No. 12, Palani Main Road, Palani, Dindigul, Tamil Nadu - 624601',
-      phone: '+91 98421 55670',
-      altPhone: '+91 94432 19800',
-      email: 'contact@nandhimotors.com',
+      address: '170/2, ITTERI ROAD, PALANI-624601',
+      phone: '+91 7604857272',
+      altPhone: '+91 7604847272',
+      email: 'nandhimotorspalani@gmail.com',
       website: 'www.nandhimotors.com',
-      gstin: '33AABCN1234F1Z9',
+      gstin: '33BCXPA4714R1Z2',
       state: 'Tamil Nadu (33)',
-      pan: 'AABCN1234F',
-      bankName: 'HDFC Bank',
+      pan: '',
+      bankName: 'IDBI BANK',
       accountName: 'NANDHI MOTORS',
-      accountNumber: '50200088991234',
-      ifscCode: 'HDFC0001234',
-      branch: 'Namakkal Main Branch',
+      accountNumber: '0920102000007825',
+      ifscCode: 'IBKL0000920',
+      branch: 'PALANI BRANCH',
       upiId: 'nandhimotors@hdfcbank',
       quotationTerms: `1. Prices quoted are valid for 7 days from the date of issuance and subject to manufacturer revision.
 2. Final delivery is subject to vehicle color and model stock availability.
@@ -186,11 +256,40 @@ export default function App() {
         sparesGstEnabled: true,
         laborRate: 18,
         sparesRate: 18
-      }
+      },
+      printSettings: DEFAULT_PRINT_SETTINGS
     };
   };
 
   const [companyProfile, setCompanyProfile] = useState(readCompanyProfileFromStorage);
+  const [printSettings, setPrintSettings] = useState(() => readPrintSettingsFromStorage());
+
+  useEffect(() => {
+    const currentPrintTheme = printSettings || DEFAULT_PRINT_SETTINGS;
+    if (typeof document !== 'undefined') {
+      const existingStyle = document.getElementById('nandhi-print-theme');
+      const css = buildPrintThemeCss(currentPrintTheme);
+      if (existingStyle) {
+        existingStyle.innerHTML = css;
+      } else {
+        const tag = document.createElement('style');
+        tag.id = 'nandhi-print-theme';
+        tag.innerHTML = css;
+        document.head.appendChild(tag);
+      }
+    }
+  }, [printSettings]);
+
+  useEffect(() => {
+    if (!companyProfile) return;
+    const nextProfile = {
+      ...companyProfile,
+      printSettings: printSettings || DEFAULT_PRINT_SETTINGS
+    };
+    setCompanyProfile(nextProfile);
+    localStorage.setItem('nandhi_app_company_profile', JSON.stringify(nextProfile));
+    localStorage.setItem('nandhi_company_profile', JSON.stringify(nextProfile));
+  }, [printSettings]);
 
   useEffect(() => {
     if (!companyProfile) return;
@@ -812,14 +911,19 @@ export default function App() {
   const handleSetCompanyProfile = async (action) => {
     const updated = typeof action === 'function' ? action(companyProfile) : action;
     const nextProfile = { ...(companyProfile || {}), ...(updated || {}) };
-    setCompanyProfile(nextProfile);
-    localStorage.setItem('nandhi_app_company_profile', JSON.stringify(nextProfile));
-    localStorage.setItem('nandhi_company_profile', JSON.stringify(nextProfile));
+    const nextWithPrintSettings = {
+      ...nextProfile,
+      printSettings: nextProfile.printSettings || printSettings || DEFAULT_PRINT_SETTINGS
+    };
+    setCompanyProfile(nextWithPrintSettings);
+    setPrintSettings(nextWithPrintSettings.printSettings || DEFAULT_PRINT_SETTINGS);
+    localStorage.setItem('nandhi_app_company_profile', JSON.stringify(nextWithPrintSettings));
+    localStorage.setItem('nandhi_company_profile', JSON.stringify(nextWithPrintSettings));
     try {
       await fetch(`${API_BASE_URL}/api/company-profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nextProfile)
+        body: JSON.stringify(nextWithPrintSettings)
       });
     } catch (e) {
       console.error('Failed to sync company profile with MongoDB:', e);
@@ -1055,6 +1159,8 @@ export default function App() {
               setShowPreviews={setShowPreviews}
               companyProfile={companyProfile}
               setCompanyProfile={handleSetCompanyProfile}
+              printSettings={printSettings}
+              setPrintSettings={setPrintSettings}
             />
           ) : activeTab === 'management' && activeSubTab === 'customers' ? (
             <CustomersPage
@@ -1082,6 +1188,7 @@ export default function App() {
               setSpares={handleSetSpares}
               vehicles={vehicles}
               showPreviews={showPreviews}
+              companyProfile={companyProfile}
             />
           ) : activeTab === 'accounting' ? (
             <AccountingLedgerPage

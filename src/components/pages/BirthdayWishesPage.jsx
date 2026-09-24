@@ -38,7 +38,7 @@ export default function BirthdayWishesPage({ customers = [], invoices = [] }) {
             date: inv.customerBirthday, // YYYY-MM-DD
             customerName: inv.customerName || 'Unknown',
             mobile: inv.customerPhone || inv.customerMobile || '',
-            vehicleRegNo: inv.vehicleModel || '',
+            vehicleRegNo: (inv.vehicleRegNo || inv.vehicleNo || inv.vehicleModel || '').toUpperCase(),
             discountCode: 'BDAY15'
           });
         }
@@ -54,7 +54,7 @@ export default function BirthdayWishesPage({ customers = [], invoices = [] }) {
                 date: dateStr,
                 customerName: inv.customerName || 'Unknown',
                 mobile: inv.customerPhone || inv.customerMobile || '',
-                vehicleRegNo: inv.vehicleModel || '',
+                vehicleRegNo: (inv.vehicleRegNo || inv.vehicleNo || inv.vehicleModel || '').toUpperCase(),
                 discountCode: 'ANNI10'
              });
           }
@@ -302,7 +302,7 @@ export default function BirthdayWishesPage({ customers = [], invoices = [] }) {
                       </a>
                     </p>
                     <p><strong>Vehicle:</strong> {activeEvent.vehicleModel}</p>
-                    <p><strong>Reg No:</strong> {activeEvent.vehicleRegNo}</p>
+                    <p><strong>Reg No:</strong> <span style={{ textTransform: 'uppercase' }}>{(activeEvent.vehicleRegNo || '').toUpperCase()}</span></p>
                   </div>
 
                   <div>

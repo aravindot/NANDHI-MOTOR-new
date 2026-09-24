@@ -77,7 +77,7 @@ export default function WarrantyClaimPage({
       ...prev,
       customerName: c.name || '',
       customerMobile: c.mobile || '',
-      vehicleRegNo: c.vehicleRegNo || prev.vehicleRegNo,
+      vehicleRegNo: (c.vehicleRegNo || c.vehicleNo || prev.vehicleRegNo || '').toUpperCase(),
       vehicleModel: c.vehicleModel || prev.vehicleModel
     }));
     setShowCustomerDropdown(false);
@@ -163,6 +163,9 @@ export default function WarrantyClaimPage({
 
     const claimPayload = {
       ...formData,
+      vehicleRegNo: (formData.vehicleRegNo || '').toUpperCase(),
+      chassisNo: (formData.chassisNo || '').toUpperCase(),
+      engineNo: (formData.engineNo || '').toUpperCase(),
       claimAmount: Number(formData.claimAmount || 0),
       submissionDate: new Date().toISOString().split('T')[0],
       settlementDate: ''
@@ -228,9 +231,9 @@ export default function WarrantyClaimPage({
       customerName: claim.customerName || '',
       customerMobile: claim.customerMobile || '',
       vehicleModel: claim.vehicleModel || availableVehicleModels[0] || '',
-      vehicleRegNo: claim.vehicleRegNo || '',
-      chassisNo: claim.chassisNo || '',
-      engineNo: claim.engineNo || '',
+      vehicleRegNo: (claim.vehicleRegNo || '').toUpperCase(),
+      chassisNo: (claim.chassisNo || '').toUpperCase(),
+      engineNo: (claim.engineNo || '').toUpperCase(),
       dateOfSale: claim.dateOfSale || new Date().toISOString().split('T')[0],
       odometerKm: claim.odometerKm || '',
       defectivePart: claim.defectivePart || '',
@@ -534,7 +537,7 @@ export default function WarrantyClaimPage({
                       <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>{claim.customerMobile || 'No mobile'}</div>
                     </td>
                     <td style={{ padding: '10px 14px' }}>
-                      <div style={{ fontWeight: 500, color: '#1f2937', fontSize: '0.82rem' }}>{claim.vehicleRegNo}</div>
+                      <div style={{ fontWeight: 500, color: '#1f2937', fontSize: '0.82rem', textTransform: 'uppercase' }}>{(claim.vehicleRegNo || '').toUpperCase()}</div>
                       <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>{claim.vehicleModel}</div>
                     </td>
                     <td style={{ padding: '10px 14px' }}>
@@ -695,7 +698,7 @@ export default function WarrantyClaimPage({
                       </td>
                       <td style={{ padding: '10px 14px' }}>
                         <div style={{ fontWeight: 500, color: '#374151', fontSize: '0.85rem' }}>{claim.customerName}</div>
-                        <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '2px' }}>Reg: {claim.vehicleRegNo}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '2px', textTransform: 'uppercase' }}>Reg: {(claim.vehicleRegNo || '').toUpperCase()}</div>
                       </td>
                       <td style={{ padding: '10px 14px' }}>
                         <div style={{ fontWeight: 500, color: '#374151', fontSize: '0.85rem' }}>{claim.defectivePart}</div>
@@ -849,8 +852,8 @@ export default function WarrantyClaimPage({
                     required
                     placeholder="TN-37-AB-1234"
                     value={formData.vehicleRegNo}
-                    onChange={(e) => setFormData({ ...formData, vehicleRegNo: e.target.value })}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}
+                    onChange={(e) => setFormData({ ...formData, vehicleRegNo: e.target.value.toUpperCase() })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.9rem', textTransform: 'uppercase' }}
                   />
                 </div>
               </div>
@@ -1117,7 +1120,7 @@ export default function WarrantyClaimPage({
             <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px 16px' }}>
               <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Customer</span><strong>{selectedClaimDetail.customerName}</strong></div>
               <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Mobile</span><strong>{selectedClaimDetail.customerMobile || '—'}</strong></div>
-              <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Vehicle</span><strong>{selectedClaimDetail.vehicleRegNo}</strong></div>
+              <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Vehicle</span><strong style={{ textTransform: 'uppercase' }}>{(selectedClaimDetail.vehicleRegNo || '').toUpperCase()}</strong></div>
               <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Model</span><strong>{selectedClaimDetail.vehicleModel}</strong></div>
               <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Defective Part</span><strong>{selectedClaimDetail.defectivePart}</strong></div>
               <div><span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Part Code</span><strong>{selectedClaimDetail.partCode || '—'}</strong></div>
@@ -1195,6 +1198,7 @@ export default function WarrantyClaimPage({
         onClose={() => setPrintModalConfig(prev => ({ ...prev, isOpen: false }))}
         type={printModalConfig.type}
         data={printModalConfig.data}
+        companyProfile={companyProfile}
       />
     </div>
   );

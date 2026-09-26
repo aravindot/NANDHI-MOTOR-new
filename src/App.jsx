@@ -24,8 +24,8 @@ const SESSION_KEY = 'nandhi_app_session';
 const SESSION_TIMEOUT_KEY = 'nandhi_app_session_expires_at';
 
 const APP_CREDENTIALS = {
-  username: '9791537272',
-  password: 'Nandhimotors@5233'
+  username: 'superadmin',
+  password: 'Nandhimoto@tn94'
 };
 
 const readLocalStorageJson = (key, fallback) => {

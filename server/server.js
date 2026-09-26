@@ -43,6 +43,7 @@ mongoose
   .connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
   .then(async () => {
     console.log('Connected to MongoDB Atlas successfully.');
+    await seedDatabase();
   })
   .catch((err) => {
     console.error('MongoDB Connection Error:', err.message);

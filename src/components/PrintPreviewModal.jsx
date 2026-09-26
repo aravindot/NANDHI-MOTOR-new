@@ -799,26 +799,38 @@ export default function PrintPreviewModal({
               <div>
                 <div className="doc-grid-2">
                   <div>
-                    <p><strong>Booking Ref:</strong> <span style={{ fontFamily: 'monospace', color: accentColor, fontWeight: 700 }}>#{data.bookingId || 'BK-01'}</span></p>
-                    <p><strong>Booking Date:</strong> {data.createdOn || new Date().toLocaleDateString('en-IN')}</p>
+                    <p><strong>Booking Ref:</strong> <span style={{ fontFamily: 'monospace', color: accentColor, fontWeight: 700 }}>#{data.bookingId || data.id || 'BK-01'}</span></p>
+                    <p><strong>Booking Date:</strong> {data.bookingDate || data.createdOn || new Date().toLocaleDateString('en-IN')}</p>
                     <p><strong>Customer Name:</strong> {data.customerName || data.name}</p>
-                    <p><strong>Mobile:</strong> {data.customerPhone || data.mobile}</p>
+                    <p><strong>Mobile:</strong> {data.mobile || data.customerPhone || 'N/A'}</p>
                     {(data.customerAddress || data.address) && <p><strong>Address:</strong> {data.customerAddress || data.address}</p>}
                   </div>
                   <div>
                     <p><strong>Booked Vehicle:</strong> {data.vehicleModel}</p>
                     <p><strong>Color Choice:</strong> {data.vehicleColor}</p>
                     <p><strong>Payment Mode:</strong> {data.paymentMode || 'Cash / GPay'}</p>
+                    {data.deliveryDate && <p><strong>Expected Delivery:</strong> {data.deliveryDate}</p>}
+                    {data.status && (
+                      <p>
+                        <strong>Status:</strong>{' '}
+                        <span style={{ 
+                          fontWeight: 700, 
+                          color: data.status === 'Active' ? '#059669' : data.status === 'Returned' ? '#dc2626' : '#2563eb' 
+                        }}>
+                          {data.status}
+                        </span>
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', padding: '16px', borderRadius: '6px', textAlign: 'center', margin: '20px 0' }}>
                   <div style={{ fontSize: '12px', textTransform: 'uppercase', color: secondaryColor, fontWeight: 700 }}>Advance Booking Amount Received</div>
                   <div style={{ fontSize: '28px', fontWeight: 800, color: accentColor, marginTop: '4px' }}>
-                    ₹{Number(data.advancePaid || 5000).toLocaleString('en-IN')}
+                    ₹{Number(data.bookingAmount ?? data.advancePaid ?? data.advanceAmount ?? 0).toLocaleString('en-IN')}
                   </div>
                   <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
-                    Tentative Delivery Schedule: Within 7 to 10 Working Days
+                    {data.deliveryDate ? `Tentative Delivery Date: ${data.deliveryDate}` : 'Tentative Delivery Schedule: Within 7 to 10 Working Days'}
                   </div>
                 </div>
 

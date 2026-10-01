@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { API_BASE_URL } from '../../config/api';
 import {
   Gift,
   Coins,
@@ -68,18 +69,66 @@ export default function RedeemPointsPage({ customers = [] }) {
 
   // Loyalty balances
   const [loyaltyBalances, setLoyaltyBalances] = useState(() => {
-    const saved = localStorage.getItem('nandhi_loyalty_balances');
-    return saved
-      ? JSON.parse(saved)
-      : [];
+    try {
+      const saved = localStorage.getItem('nandhi_loyalty_balances');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
   });
 
   const [redemptions, setRedemptions] = useState(() => {
-    const saved = localStorage.getItem('nandhi_redemptions');
-    return saved
-      ? JSON.parse(saved)
-      : [];
+    try {
+      const saved = localStorage.getItem('nandhi_redemptions');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
   });
+
+  useEffect(() => {
+    const fetchLoyaltyData = async () => {
+      try {
+        const [bRes, rRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/loyalty-balances`),
+          fetch(`${API_BASE_URL}/api/redemptions`)
+        ]);
+        if (bRes.ok) {
+          const bData = await bRes.json();
+          if (Array.isArray(bData) && bData.length > 0) {
+            setLoyaltyBalances(prev => {
+              const map = new Map();
+              bData.forEach(item => { if (item?.id) map.set(item.id, item); });
+              prev.forEach(item => { if (item?.id && !map.has(item.id)) map.set(item.id, item); });
+              return Array.from(map.values());
+            });
+          }
+        }
+        if (rRes.ok) {
+          const rData = await rRes.json();
+          if (Array.isArray(rData) && rData.length > 0) {
+            setRedemptions(prev => {
+              const map = new Map();
+              rData.forEach(item => { if (item?.id) map.set(item.id, item); });
+              prev.forEach(item => { if (item?.id && !map.has(item.id)) map.set(item.id, item); });
+              return Array.from(map.values());
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Fallback to local storage for loyalty records.');
+      }
+    };
+    fetchLoyaltyData();
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('nandhi_loyalty_balances', JSON.stringify(loyaltyBalances));
+  }, [loyaltyBalances]);
+
+  useEffect(() => {
+    localStorage.setItem('nandhi_redemptions', JSON.stringify(redemptions));
+  }, [redemptions]);
 
   const filteredBalances = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -103,13 +152,15 @@ export default function RedeemPointsPage({ customers = [] }) {
       return;
     }
 
+    let updatedCust = null;
     const updatedBalances = loyaltyBalances.map((b) => {
       if (b.id === customer.id) {
-        return {
+        updatedCust = {
           ...b,
           availablePoints: b.availablePoints - selectedReward.pointsRequired,
           redeemedPoints: b.redeemedPoints + selectedReward.pointsRequired
         };
+        return updatedCust;
       }
       return b;
     });
@@ -128,6 +179,29 @@ export default function RedeemPointsPage({ customers = [] }) {
     setLoyaltyBalances(updatedBalances);
     setRedemptions([newRedemption, ...redemptions]);
     setIsRedeemModalOpen(false);
+
+    if (updatedCust) {
+      try {
+        fetch(`${API_BASE_URL}/api/loyalty-balances`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedCust)
+        }).catch(err => console.error('Failed to sync loyalty balance:', err));
+      } catch (e) {
+        console.error('Failed to sync loyalty balance:', e);
+      }
+    }
+
+    try {
+      fetch(`${API_BASE_URL}/api/redemptions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRedemption)
+      }).catch(err => console.error('Failed to sync redemption:', err));
+    } catch (e) {
+      console.error('Failed to sync redemption:', e);
+    }
+
     alert(`Reward "${selectedReward.title}" redeemed successfully for ${customer.name}!`);
   };
 

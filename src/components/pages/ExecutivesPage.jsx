@@ -22,10 +22,12 @@ import { API_BASE_URL } from '../../config/api';
 
 export default function ExecutivesPage() {
   const [executives, setExecutives] = useState(() => {
-    const saved = localStorage.getItem('nandhi_app_executives');
-    return saved
-      ? JSON.parse(saved)
-      : [];
+    try {
+      const saved = localStorage.getItem('nandhi_app_executives') || localStorage.getItem('nandhi_executives');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,7 +54,14 @@ export default function ExecutivesPage() {
         const res = await fetch(`${API_BASE_URL}/api/executives`);
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) setExecutives(data);
+          if (Array.isArray(data) && data.length > 0) {
+            setExecutives(prev => {
+              const map = new Map();
+              data.forEach(item => { if (item?.id) map.set(item.id, item); });
+              prev.forEach(item => { if (item?.id && !map.has(item.id)) map.set(item.id, item); });
+              return Array.from(map.values());
+            });
+          }
         }
       } catch (err) {
         console.warn('Fallback to local storage for executives.');
@@ -62,6 +71,7 @@ export default function ExecutivesPage() {
   }, []);
 
   useEffect(() => {
+    localStorage.setItem('nandhi_app_executives', JSON.stringify(executives));
     localStorage.setItem('nandhi_executives', JSON.stringify(executives));
   }, [executives]);
 
@@ -119,17 +129,23 @@ export default function ExecutivesPage() {
     }
 
     if (editingExecutive) {
-      const updatedList = executives.map((e) =>
-        e.id === editingExecutive.id
-          ? {
-              ...e,
-              ...formData,
-              monthlySalesTarget: Number(formData.monthlySalesTarget || 0),
-              servicesTarget: Number(formData.servicesTarget || 0)
-            }
-          : e
-      );
+      const updatedEmp = {
+        ...editingExecutive,
+        ...formData,
+        monthlySalesTarget: Number(formData.monthlySalesTarget || 0),
+        servicesTarget: Number(formData.servicesTarget || 0)
+      };
+      const updatedList = executives.map((e) => (e.id === editingExecutive.id ? updatedEmp : e));
       setExecutives(updatedList);
+      try {
+        fetch(`${API_BASE_URL}/api/executives`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedEmp)
+        }).catch(err => console.error('Failed to sync updated executive:', err));
+      } catch (err) {
+        console.error('Failed to sync updated executive:', err);
+      }
     } else {
       const nextNum = executives.reduce((max, emp) => {
         const n = parseInt((emp.id || '').replace(/\D/g, ''), 10);

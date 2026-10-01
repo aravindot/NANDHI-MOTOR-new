@@ -771,7 +771,12 @@ export default function LeadsManagement({
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
-            setBookings(data);
+            setBookings(prev => {
+              const map = new Map();
+              data.forEach(item => { if (item?.id) map.set(item.id, item); });
+              prev.forEach(item => { if (item?.id && !map.has(item.id)) map.set(item.id, item); });
+              return Array.from(map.values());
+            });
           }
         }
       } catch (err) {

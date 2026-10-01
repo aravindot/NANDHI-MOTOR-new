@@ -90,7 +90,14 @@ export default function WarrantyClaimPage({
         const res = await fetch(`${API_BASE_URL}/api/warranties`);
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) setClaims(data);
+          if (Array.isArray(data) && data.length > 0) {
+            setClaims(prev => {
+              const map = new Map();
+              data.forEach(item => { if (item?.id) map.set(item.id, item); });
+              prev.forEach(item => { if (item?.id && !map.has(item.id)) map.set(item.id, item); });
+              return Array.from(map.values());
+            });
+          }
         }
       } catch (err) {
         console.warn('Fallback to local storage for warranty claims.');
@@ -265,19 +272,32 @@ export default function WarrantyClaimPage({
   
   const handleUpdateTracking = (e) => {
     e.preventDefault();
+    let updatedTrackingClaim = null;
     const nextClaims = claims.map(c => {
       if (c.id === trackingModalConfig.claim.id) {
-        return {
+        updatedTrackingClaim = {
           ...c,
           courierPartner: trackingModalConfig.courierPartner,
           trackingNo: trackingModalConfig.trackingNo,
           dispatchStatus: trackingModalConfig.dispatchStatus
         };
+        return updatedTrackingClaim;
       }
       return c;
     });
     setClaims(nextClaims);
-    localStorage.setItem('nandhi_app_warranty_claims', JSON.stringify(nextClaims));
+    localStorage.setItem('nandhi_warranty_claims', JSON.stringify(nextClaims));
+    if (updatedTrackingClaim) {
+      try {
+        fetch(`${API_BASE_URL}/api/warranties`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedTrackingClaim)
+        }).catch(err => console.error('Failed to sync claim tracking with MongoDB:', err));
+      } catch (err) {
+        console.error('Failed to sync claim tracking with MongoDB:', err);
+      }
+    }
     setTrackingModalConfig({ isOpen: false, claim: null, courierPartner: '', trackingNo: '', dispatchStatus: 'Pending Dispatch' });
   };
 

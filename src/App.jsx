@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import DashboardOverview from './components/DashboardOverview';
@@ -35,6 +35,57 @@ const readLocalStorageJson = (key, fallback) => {
     return JSON.parse(raw);
   } catch (error) {
     return fallback;
+  }
+};
+
+const mergeCollections = (backendList, localList, idKey = 'id') => {
+  const getIdentifier = (item) => {
+    if (!item) return '';
+    if (idKey === 'mobile') {
+      return String(item.mobile || item.id || '');
+    }
+    return String(item[idKey] || item.id || '');
+  };
+
+  const validLocals = Array.isArray(localList) ? localList : [];
+  if (!Array.isArray(backendList) || backendList.length === 0) {
+    return { merged: validLocals, unSyncedLocals: validLocals };
+  }
+  if (validLocals.length === 0) {
+    return { merged: backendList, unSyncedLocals: [] };
+  }
+
+  const map = new Map();
+  backendList.forEach((item) => {
+    const key = getIdentifier(item);
+    if (key) {
+      map.set(key, item);
+    }
+  });
+
+  const unSyncedLocals = [];
+  validLocals.forEach((item) => {
+    const key = getIdentifier(item);
+    if (key) {
+      if (!map.has(key)) {
+        map.set(key, item);
+        unSyncedLocals.push(item);
+      }
+    }
+  });
+
+  return { merged: Array.from(map.values()), unSyncedLocals };
+};
+
+const syncToBackend = async (path, item) => {
+  try {
+    await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item)
+    });
+  } catch (e) {
+    // Offline or network error; local state remains source of truth
   }
 };
 
@@ -139,13 +190,6 @@ export default function App() {
     setLoginError('Invalid username or password');
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setLoginForm({ username: '', password: '' });
-    setLoginError('');
-    clearSessionExpiry();
-    localStorage.removeItem(SESSION_KEY);
-  };
 
   // Navigation State
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -326,108 +370,171 @@ export default function App() {
     localStorage.setItem('nandhi_app_show_previews', JSON.stringify(showPreviews));
   }, [showPreviews]);
 
-  // Fetch initial data from backend on mount and only fall back to local storage if the backend is unavailable.
-  useEffect(() => {
-    const initData = async () => {
-      const loadFallbacks = () => {
-        setVehicles(readLocalStorageJson('nandhi_app_vehicles', []));
-        setLeads(readLocalStorageJson('nandhi_app_leads', []));
-        setCustomers(readLocalStorageJson('nandhi_app_customers', []));
-        setSpares(readLocalStorageJson('nandhi_app_spares', []));
-        setInvoices(readLocalStorageJson('nandhi_app_invoices', []));
-        setQuotations(readLocalStorageJson('nandhi_app_quotations', []));
-        setJobSheets(readLocalStorageJson('nandhi_app_jobsheets', []));
-        setServiceBills(readLocalStorageJson('nandhi_app_service_bills', []));
-        setDailyExpenses(readLocalStorageJson('nandhi_app_daily_expenses', []));
-        setPurchaseInvoices(readLocalStorageJson('nandhi_app_purchase_invoices', []));
+  // Logout handler that safely flushes current state to localStorage before deauthenticating
+  const handleLogout = () => {
+    try {
+      localStorage.setItem('nandhi_app_leads', JSON.stringify(leads));
+      localStorage.setItem('nandhi_app_customers', JSON.stringify(customers));
+      localStorage.setItem('nandhi_app_spares', JSON.stringify(spares));
+      localStorage.setItem('nandhi_app_invoices', JSON.stringify(invoices));
+      localStorage.setItem('nandhi_app_quotations', JSON.stringify(quotations));
+      localStorage.setItem('nandhi_app_vehicles', JSON.stringify(vehicles));
+      localStorage.setItem('nandhi_app_jobsheets', JSON.stringify(jobSheets));
+      localStorage.setItem('nandhi_app_service_bills', JSON.stringify(serviceBills));
+      localStorage.setItem('nandhi_app_daily_expenses', JSON.stringify(dailyExpenses));
+      localStorage.setItem('nandhi_app_purchase_invoices', JSON.stringify(purchaseInvoices));
+      if (companyProfile) {
+        localStorage.setItem('nandhi_app_company_profile', JSON.stringify(companyProfile));
+        localStorage.setItem('nandhi_company_profile', JSON.stringify(companyProfile));
+      }
+    } catch (e) {
+      console.warn('Unable to flush state to localStorage on logout', e);
+    }
 
-        const savedPrimary = localStorage.getItem('nandhi_app_company_profile');
-        const savedLegacy = localStorage.getItem('nandhi_company_profile');
-        const savedProfile = savedPrimary || savedLegacy;
-        if (savedProfile) {
-          try {
-            setCompanyProfile(JSON.parse(savedProfile));
-          } catch (e) {
-            console.warn('Unable to read saved company profile from localStorage.', e);
-          }
+    setIsAuthenticated(false);
+    setLoginForm({ username: '', password: '' });
+    setLoginError('');
+    clearSessionExpiry();
+    localStorage.removeItem(SESSION_KEY);
+  };
+
+  // Fetch initial data from backend and merge safely with local storage so user records are never lost
+  const initData = useCallback(async () => {
+    const loadFallbacks = () => {
+      setVehicles(readLocalStorageJson('nandhi_app_vehicles', []));
+      setLeads(readLocalStorageJson('nandhi_app_leads', []));
+      setCustomers(readLocalStorageJson('nandhi_app_customers', []));
+      setSpares(readLocalStorageJson('nandhi_app_spares', []));
+      setInvoices(readLocalStorageJson('nandhi_app_invoices', []));
+      setQuotations(readLocalStorageJson('nandhi_app_quotations', []));
+      setJobSheets(readLocalStorageJson('nandhi_app_jobsheets', []));
+      setServiceBills(readLocalStorageJson('nandhi_app_service_bills', []));
+      setDailyExpenses(readLocalStorageJson('nandhi_app_daily_expenses', []));
+      setPurchaseInvoices(readLocalStorageJson('nandhi_app_purchase_invoices', []));
+
+      const savedPrimary = localStorage.getItem('nandhi_app_company_profile');
+      const savedLegacy = localStorage.getItem('nandhi_company_profile');
+      const savedProfile = savedPrimary || savedLegacy;
+      if (savedProfile) {
+        try {
+          setCompanyProfile(JSON.parse(savedProfile));
+        } catch (e) {
+          console.warn('Unable to read saved company profile from localStorage.', e);
         }
-      };
-
-      try {
-        const [vRes, lRes, cRes, sRes, invRes, qRes, jsRes, sbRes, expRes, purRes, profRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/vehicles`),
-          fetch(`${API_BASE_URL}/api/leads`),
-          fetch(`${API_BASE_URL}/api/customers`),
-          fetch(`${API_BASE_URL}/api/spares`),
-          fetch(`${API_BASE_URL}/api/invoices`),
-          fetch(`${API_BASE_URL}/api/quotations`),
-          fetch(`${API_BASE_URL}/api/jobsheets`),
-          fetch(`${API_BASE_URL}/api/service-bills`),
-          fetch(`${API_BASE_URL}/api/expenses`),
-          fetch(`${API_BASE_URL}/api/purchases`),
-          fetch(`${API_BASE_URL}/api/company-profile`)
-        ]);
-
-        const vData = vRes.ok ? await vRes.json() : [];
-        const lData = lRes.ok ? await lRes.json() : [];
-        const cData = cRes.ok ? await cRes.json() : [];
-        const sData = sRes.ok ? await sRes.json() : [];
-        const invData = invRes.ok ? await invRes.json() : [];
-        const qData = qRes.ok ? await qRes.json() : [];
-        const jsData = jsRes.ok ? await jsRes.json() : [];
-        const sbData = sbRes.ok ? await sbRes.json() : [];
-        const expData = expRes.ok ? await expRes.json() : [];
-        const purData = purRes.ok ? await purRes.json() : [];
-        const profData = profRes.ok ? await profRes.json() : null;
-
-        if (Array.isArray(vData)) setVehicles(vData);
-        if (Array.isArray(lData)) setLeads(lData);
-        if (Array.isArray(cData)) setCustomers(cData);
-        if (Array.isArray(sData)) setSpares(sData);
-        if (Array.isArray(invData)) setInvoices(invData);
-        if (Array.isArray(qData)) setQuotations(qData);
-        if (Array.isArray(jsData)) setJobSheets(jsData);
-        if (Array.isArray(sbData)) setServiceBills(sbData);
-        if (Array.isArray(expData)) setDailyExpenses(expData);
-        if (Array.isArray(purData)) setPurchaseInvoices(purData);
-        if (profData && profData.name) setCompanyProfile(profData);
-      } catch (e) {
-        console.warn('Backend unavailable; using local storage fallback.', e);
-        loadFallbacks();
       }
     };
-    initData();
+
+    try {
+      const fetchEndpoint = async (url) => {
+        try {
+          const res = await fetch(url);
+          if (res.ok) return await res.json();
+        } catch (e) {
+          // Individual route failure
+        }
+        return null;
+      };
+
+      const [vData, lData, cData, sData, invData, qData, jsData, sbData, expData, purData, profData] = await Promise.all([
+        fetchEndpoint(`${API_BASE_URL}/api/vehicles`),
+        fetchEndpoint(`${API_BASE_URL}/api/leads`),
+        fetchEndpoint(`${API_BASE_URL}/api/customers`),
+        fetchEndpoint(`${API_BASE_URL}/api/spares`),
+        fetchEndpoint(`${API_BASE_URL}/api/invoices`),
+        fetchEndpoint(`${API_BASE_URL}/api/quotations`),
+        fetchEndpoint(`${API_BASE_URL}/api/jobsheets`),
+        fetchEndpoint(`${API_BASE_URL}/api/service-bills`),
+        fetchEndpoint(`${API_BASE_URL}/api/expenses`),
+        fetchEndpoint(`${API_BASE_URL}/api/purchases`),
+        fetchEndpoint(`${API_BASE_URL}/api/company-profile`)
+      ]);
+
+      const localVehicles = readLocalStorageJson('nandhi_app_vehicles', []);
+      const vResult = mergeCollections(vData, localVehicles, 'id');
+      setVehicles(vResult.merged);
+      vResult.unSyncedLocals.forEach(item => syncToBackend('/api/vehicles', item));
+
+      const localLeads = readLocalStorageJson('nandhi_app_leads', []);
+      const lResult = mergeCollections(lData, localLeads, 'id');
+      setLeads(lResult.merged);
+      lResult.unSyncedLocals.forEach(item => syncToBackend('/api/leads', item));
+
+      const localCustomers = readLocalStorageJson('nandhi_app_customers', []);
+      const cResult = mergeCollections(cData, localCustomers, 'mobile');
+      setCustomers(cResult.merged);
+      cResult.unSyncedLocals.forEach(item => syncToBackend('/api/customers', item));
+
+      const localSpares = readLocalStorageJson('nandhi_app_spares', []);
+      const sResult = mergeCollections(sData, localSpares, 'id');
+      setSpares(sResult.merged);
+      sResult.unSyncedLocals.forEach(item => syncToBackend('/api/spares', item));
+
+      const localInvoices = readLocalStorageJson('nandhi_app_invoices', []);
+      const invResult = mergeCollections(invData, localInvoices, 'invoiceNo');
+      setInvoices(invResult.merged);
+      invResult.unSyncedLocals.forEach(item => syncToBackend('/api/invoices', item));
+
+      const localQuotes = readLocalStorageJson('nandhi_app_quotations', []);
+      const qResult = mergeCollections(qData, localQuotes, 'quoteId');
+      setQuotations(qResult.merged);
+      qResult.unSyncedLocals.forEach(item => syncToBackend('/api/quotations', item));
+
+      const localJobSheets = readLocalStorageJson('nandhi_app_jobsheets', []);
+      const jsResult = mergeCollections(jsData, localJobSheets, 'id');
+      setJobSheets(jsResult.merged);
+      jsResult.unSyncedLocals.forEach(item => syncToBackend('/api/jobsheets', item));
+
+      const localBills = readLocalStorageJson('nandhi_app_service_bills', []);
+      const sbResult = mergeCollections(sbData, localBills, 'id');
+      setServiceBills(sbResult.merged);
+      sbResult.unSyncedLocals.forEach(item => syncToBackend('/api/service-bills', item));
+
+      const localExpenses = readLocalStorageJson('nandhi_app_daily_expenses', []);
+      const expResult = mergeCollections(expData, localExpenses, 'id');
+      setDailyExpenses(expResult.merged);
+      expResult.unSyncedLocals.forEach(item => syncToBackend('/api/expenses', item));
+
+      const localPurchases = readLocalStorageJson('nandhi_app_purchase_invoices', []);
+      const purResult = mergeCollections(purData, localPurchases, 'id');
+      setPurchaseInvoices(purResult.merged);
+      purResult.unSyncedLocals.forEach(item => syncToBackend('/api/purchases', item));
+
+      if (profData && profData.name) {
+        setCompanyProfile(profData);
+      }
+    } catch (e) {
+      console.warn('Backend unavailable; using local storage fallback.', e);
+      loadFallbacks();
+    }
   }, []);
+
+  useEffect(() => {
+    initData();
+  }, [initData]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      initData();
+    }
+  }, [isAuthenticated, initData]);
 
   // MongoDB Synchronization Helpers
   const syncVehiclesWithDatabase = async (prev, updated) => {
-    if (updated.length > prev.length) {
-      // Add Vehicle
-      const newVeh = updated[0];
+    const added = updated.filter(u => !prev.some(p => p.id === u.id));
+    const deleted = prev.filter(p => !updated.some(u => u.id === p.id));
+    const edited = updated.filter(u => {
+      const match = prev.find(p => p.id === u.id);
+      return match && JSON.stringify(match) !== JSON.stringify(u);
+    });
+
+    for (const v of [...added, ...edited]) {
+      syncToBackend('/api/vehicles', v);
+    }
+    for (const v of deleted) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/vehicles`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newVeh)
-        });
-        if (res.ok) {
-          const saved = await res.json();
-          setVehicles(current => current.map(item => item.id === newVeh.id ? saved : item));
-        }
+        await fetch(`${API_BASE_URL}/api/vehicles/${v.id}`, { method: 'DELETE' });
       } catch (e) {
-        console.error('Failed to sync added vehicle with MongoDB:', e);
-      }
-    } else if (updated.length < prev.length) {
-      // Delete Vehicle
-      const deleted = prev.find(pv => !updated.some(uv => uv.id === pv.id));
-      if (deleted) {
-        try {
-          await fetch(`${API_BASE_URL}/api/vehicles/${deleted.id}`, {
-            method: 'DELETE'
-          });
-        } catch (e) {
-          console.error('Failed to sync deleted vehicle with MongoDB:', e);
-        }
+        console.error('Failed to sync deleted vehicle with MongoDB:', e);
       }
     }
   };
@@ -526,17 +633,23 @@ export default function App() {
   };
 
   const syncCustomersWithDatabase = async (prev, updated) => {
-    if (updated.length < prev.length) {
-      // Delete Customer
-      const deleted = prev.find(pc => !updated.some(uc => uc.id === pc.id));
-      if (deleted) {
-        try {
-          await fetch(`${API_BASE_URL}/api/customers/${deleted.id}`, {
-            method: 'DELETE'
-          });
-        } catch (e) {
-          console.error('Failed to sync deleted customer with MongoDB:', e);
-        }
+    const getKey = (c) => c.mobile || c.id;
+    const added = updated.filter(u => !prev.some(p => getKey(p) === getKey(u)));
+    const deleted = prev.filter(p => !updated.some(u => getKey(u) === getKey(p)));
+    const edited = updated.filter(u => {
+      const match = prev.find(p => getKey(p) === getKey(u));
+      return match && JSON.stringify(match) !== JSON.stringify(u);
+    });
+
+    for (const c of [...added, ...edited]) {
+      syncToBackend('/api/customers', c);
+    }
+    for (const c of deleted) {
+      try {
+        const idToDelete = c.id || c.mobile;
+        await fetch(`${API_BASE_URL}/api/customers/${idToDelete}`, { method: 'DELETE' });
+      } catch (e) {
+        console.error('Failed to sync deleted customer with MongoDB:', e);
       }
     }
   };
@@ -555,33 +668,21 @@ export default function App() {
   };
 
   const syncSparesWithDatabase = async (prev, updated) => {
-    if (updated.length > prev.length) {
-      // Add Spare
-      const newSpare = updated[0];
+    const added = updated.filter(u => !prev.some(p => p.id === u.id));
+    const deleted = prev.filter(p => !updated.some(u => u.id === p.id));
+    const edited = updated.filter(u => {
+      const match = prev.find(p => p.id === u.id);
+      return match && JSON.stringify(match) !== JSON.stringify(u);
+    });
+
+    for (const s of [...added, ...edited]) {
+      syncToBackend('/api/spares', s);
+    }
+    for (const s of deleted) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/spares`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newSpare)
-        });
-        if (res.ok) {
-          const saved = await res.json();
-          setSpares(current => current.map(item => item.id === newSpare.id ? saved : item));
-        }
+        await fetch(`${API_BASE_URL}/api/spares/${s.id}`, { method: 'DELETE' });
       } catch (e) {
-        console.error('Failed to sync added spare with MongoDB:', e);
-      }
-    } else if (updated.length < prev.length) {
-      // Delete Spare
-      const deleted = prev.find(ps => !updated.some(us => us.id === ps.id));
-      if (deleted) {
-        try {
-          await fetch(`${API_BASE_URL}/api/spares/${deleted.id}`, {
-            method: 'DELETE'
-          });
-        } catch (e) {
-          console.error('Failed to sync deleted spare with MongoDB:', e);
-        }
+        console.error('Failed to sync deleted spare with MongoDB:', e);
       }
     }
   };
@@ -753,42 +854,21 @@ export default function App() {
 
   // JobSheets Sync Helpers
   const syncJobSheetsWithDatabase = async (prev, updated) => {
-    if (updated.length > prev.length) {
-      const newJS = updated[0];
+    const added = updated.filter(u => !prev.some(p => p.id === u.id));
+    const deleted = prev.filter(p => !updated.some(u => u.id === p.id));
+    const edited = updated.filter(u => {
+      const match = prev.find(p => p.id === u.id);
+      return match && JSON.stringify(match) !== JSON.stringify(u);
+    });
+
+    for (const j of [...added, ...edited]) {
+      syncToBackend('/api/jobsheets', j);
+    }
+    for (const j of deleted) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/jobsheets`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newJS)
-        });
-        if (res.ok) {
-          const saved = await res.json();
-          setJobSheets(current => current.map(item => item.id === newJS.id ? saved : item));
-        }
+        await fetch(`${API_BASE_URL}/api/jobsheets/${j.id}`, { method: 'DELETE' });
       } catch (e) {
-        console.error('Failed to sync added job sheet with MongoDB:', e);
-      }
-    } else if (updated.length < prev.length) {
-      const deleted = prev.find(p => !updated.some(u => u.id === p.id));
-      if (deleted) {
-        try {
-          await fetch(`${API_BASE_URL}/api/jobsheets/${deleted.id}`, { method: 'DELETE' });
-        } catch (e) {
-          console.error('Failed to sync deleted job sheet with MongoDB:', e);
-        }
-      }
-    } else {
-      const edited = updated.find((u, i) => JSON.stringify(u) !== JSON.stringify(prev[i]));
-      if (edited) {
-        try {
-          await fetch(`${API_BASE_URL}/api/jobsheets`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(edited)
-          });
-        } catch (e) {
-          console.error('Failed to sync edited job sheet with MongoDB:', e);
-        }
+        console.error('Failed to sync deleted job sheet with MongoDB:', e);
       }
     }
   };
@@ -808,29 +888,21 @@ export default function App() {
 
   // ServiceBills Sync Helpers
   const syncServiceBillsWithDatabase = async (prev, updated) => {
-    if (updated.length > prev.length) {
-      const newBill = updated[0];
+    const added = updated.filter(u => !prev.some(p => p.id === u.id));
+    const deleted = prev.filter(p => !updated.some(u => u.id === p.id));
+    const edited = updated.filter(u => {
+      const match = prev.find(p => p.id === u.id);
+      return match && JSON.stringify(match) !== JSON.stringify(u);
+    });
+
+    for (const b of [...added, ...edited]) {
+      syncToBackend('/api/service-bills', b);
+    }
+    for (const b of deleted) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/service-bills`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newBill)
-        });
-        if (res.ok) {
-          const saved = await res.json();
-          setServiceBills(current => current.map(item => item.id === newBill.id ? saved : item));
-        }
+        await fetch(`${API_BASE_URL}/api/service-bills/${b.id}`, { method: 'DELETE' });
       } catch (e) {
-        console.error('Failed to sync added service bill with MongoDB:', e);
-      }
-    } else if (updated.length < prev.length) {
-      const deleted = prev.find(p => !updated.some(u => u.id === p.id));
-      if (deleted) {
-        try {
-          await fetch(`${API_BASE_URL}/api/service-bills/${deleted.id}`, { method: 'DELETE' });
-        } catch (e) {
-          console.error('Failed to sync deleted service bill with MongoDB:', e);
-        }
+        console.error('Failed to sync deleted service bill with MongoDB:', e);
       }
     }
   };
@@ -850,29 +922,21 @@ export default function App() {
 
   // Expenses Sync Helpers
   const syncExpensesWithDatabase = async (prev, updated) => {
-    if (updated.length > prev.length) {
-      const newExp = updated[0];
+    const added = updated.filter(u => !prev.some(p => p.id === u.id));
+    const deleted = prev.filter(p => !updated.some(u => u.id === p.id));
+    const edited = updated.filter(u => {
+      const match = prev.find(p => p.id === u.id);
+      return match && JSON.stringify(match) !== JSON.stringify(u);
+    });
+
+    for (const exp of [...added, ...edited]) {
+      syncToBackend('/api/expenses', exp);
+    }
+    for (const exp of deleted) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/expenses`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newExp)
-        });
-        if (res.ok) {
-          const saved = await res.json();
-          setDailyExpenses(current => current.map(item => item.id === newExp.id ? saved : item));
-        }
+        await fetch(`${API_BASE_URL}/api/expenses/${exp.id}`, { method: 'DELETE' });
       } catch (e) {
-        console.error('Failed to sync expense with MongoDB:', e);
-      }
-    } else if (updated.length < prev.length) {
-      const deleted = prev.find(p => !updated.some(u => u.id === p.id));
-      if (deleted) {
-        try {
-          await fetch(`${API_BASE_URL}/api/expenses/${deleted.id}`, { method: 'DELETE' });
-        } catch (e) {
-          console.error('Failed to delete expense from MongoDB:', e);
-        }
+        console.error('Failed to delete expense from MongoDB:', e);
       }
     }
   };
@@ -892,29 +956,21 @@ export default function App() {
 
   // Purchase Invoices Sync Helpers
   const syncPurchasesWithDatabase = async (prev, updated) => {
-    if (updated.length > prev.length) {
-      const newPur = updated[0];
+    const added = updated.filter(u => !prev.some(p => p.id === u.id));
+    const deleted = prev.filter(p => !updated.some(u => u.id === p.id));
+    const edited = updated.filter(u => {
+      const match = prev.find(p => p.id === u.id);
+      return match && JSON.stringify(match) !== JSON.stringify(u);
+    });
+
+    for (const pur of [...added, ...edited]) {
+      syncToBackend('/api/purchases', pur);
+    }
+    for (const pur of deleted) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/purchases`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newPur)
-        });
-        if (res.ok) {
-          const saved = await res.json();
-          setPurchaseInvoices(current => current.map(item => item.id === newPur.id ? saved : item));
-        }
+        await fetch(`${API_BASE_URL}/api/purchases/${pur.id}`, { method: 'DELETE' });
       } catch (e) {
-        console.error('Failed to sync purchase invoice with MongoDB:', e);
-      }
-    } else if (updated.length < prev.length) {
-      const deleted = prev.find(p => !updated.some(u => u.id === p.id));
-      if (deleted) {
-        try {
-          await fetch(`${API_BASE_URL}/api/purchases/${deleted.id}`, { method: 'DELETE' });
-        } catch (e) {
-          console.error('Failed to delete purchase invoice from MongoDB:', e);
-        }
+        console.error('Failed to delete purchase invoice from MongoDB:', e);
       }
     }
   };

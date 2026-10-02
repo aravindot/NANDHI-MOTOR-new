@@ -28,12 +28,6 @@ const APP_CREDENTIALS = {
   password: 'Nandhi@tn94'
 };
 
-const VALID_CREDENTIALS = [
-  { username: 'NANDHI MOTORS', password: 'Nandhi@tn94' },
-  { username: '9791537272', password: 'Nandhimotors@5233' },
-  { username: 'superadmin', password: 'Nandhi@1234' }
-];
-
 const readLocalStorageJson = (key, fallback) => {
   try {
     const raw = localStorage.getItem(key);
@@ -185,11 +179,10 @@ export default function App() {
     const username = String(loginForm.username).trim();
     const password = String(loginForm.password);
 
-    const isValid = VALID_CREDENTIALS.some(
-      (cred) => cred.username.toLowerCase() === username.toLowerCase() && cred.password === password
-    );
-
-    if (isValid) {
+    if (
+      username.toLowerCase() === APP_CREDENTIALS.username.toLowerCase() &&
+      password === APP_CREDENTIALS.password
+    ) {
       setIsAuthenticated(true);
       setLoginError('');
       localStorage.setItem(SESSION_KEY, 'true');
@@ -1147,7 +1140,7 @@ export default function App() {
                 type="text"
                 value={loginForm.username}
                 onChange={(e) => setLoginForm((prev) => ({ ...prev, username: e.target.value }))}
-                placeholder="NANDHI MOTORS or 9791537272"
+                placeholder="NANDHI MOTORS"
                 autoComplete="username"
               />
             </label>

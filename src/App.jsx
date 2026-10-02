@@ -24,9 +24,15 @@ const SESSION_KEY = 'nandhi_app_session';
 const SESSION_TIMEOUT_KEY = 'nandhi_app_session_expires_at';
 
 const APP_CREDENTIALS = {
-  username: 'superadmin',
-  password: 'Nandhi@1234'
+  username: 'NANDHI MOTORS',
+  password: 'Nandhi@tn94'
 };
+
+const VALID_CREDENTIALS = [
+  { username: 'NANDHI MOTORS', password: 'Nandhi@tn94' },
+  { username: '9791537272', password: 'Nandhimotors@5233' },
+  { username: 'superadmin', password: 'Nandhi@1234' }
+];
 
 const readLocalStorageJson = (key, fallback) => {
   try {
@@ -179,7 +185,11 @@ export default function App() {
     const username = String(loginForm.username).trim();
     const password = String(loginForm.password);
 
-    if (username === APP_CREDENTIALS.username && password === APP_CREDENTIALS.password) {
+    const isValid = VALID_CREDENTIALS.some(
+      (cred) => cred.username.toLowerCase() === username.toLowerCase() && cred.password === password
+    );
+
+    if (isValid) {
       setIsAuthenticated(true);
       setLoginError('');
       localStorage.setItem(SESSION_KEY, 'true');
@@ -1137,7 +1147,7 @@ export default function App() {
                 type="text"
                 value={loginForm.username}
                 onChange={(e) => setLoginForm((prev) => ({ ...prev, username: e.target.value }))}
-                placeholder="9791537272"
+                placeholder="NANDHI MOTORS or 9791537272"
                 autoComplete="username"
               />
             </label>

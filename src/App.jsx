@@ -25,7 +25,7 @@ const SESSION_TIMEOUT_KEY = 'nandhi_app_session_expires_at';
 
 const APP_CREDENTIALS = {
   username: 'superadmin',
-  password: 'Nandhimoto@tn94'
+  password: 'Nandhi@1234'
 };
 
 const readLocalStorageJson = (key, fallback) => {

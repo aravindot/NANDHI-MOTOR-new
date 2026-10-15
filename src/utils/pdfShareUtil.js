@@ -81,6 +81,7 @@ export function buildTaxInvoicePdf(inv, customProfile = null, settings = undefin
 
   const selectedSettings = settings && Object.keys(settings).length ? settings : readPrintSettingsFromStorage();
   const effectiveSettings = getEffectivePrintSettings(selectedSettings, documentType);
+  const isTallyLedger = effectiveSettings.style === 'tally';
   const theme = getPrintTheme({ ...selectedSettings, ...effectiveSettings }, documentType);
   const primaryColor = hexToRgb(theme.primary);
   const textDark = hexToRgb(theme.secondary);
@@ -132,11 +133,17 @@ export function buildTaxInvoicePdf(inv, customProfile = null, settings = undefin
   doc.text(`${profile.address} | Phone: ${getCompanyPhones(profile)} | GSTIN: ${profile.gstin}`, 105, 21.5, { align: 'center' });
 
   // Badge Title
-  doc.setFillColor(...primaryColor);
-  doc.roundedRect(75, 24, 60, 6, 1.5, 1.5, 'F');
+  doc.setDrawColor(...textDark);
+  doc.setLineWidth(0.3);
+  if (isTallyLedger) {
+    doc.rect(75, 24, 60, 6);
+  } else {
+    doc.setFillColor(...primaryColor);
+    doc.roundedRect(75, 24, 60, 6, 1.5, 1.5, 'F');
+  }
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(...(isTallyLedger ? textDark : [255, 255, 255]));
   doc.text('TAX INVOICE', 105, 28.2, { align: 'center' });
 
   // 2. INVOICE META ROW
@@ -214,7 +221,7 @@ export function buildTaxInvoicePdf(inv, customProfile = null, settings = undefin
       styles: {
         fontSize: 8,
         cellPadding: 2,
-        fillColor: [236, 253, 245],
+        fillColor: isTallyLedger ? [255, 255, 255] : [236, 253, 245],
         textColor: [4, 120, 87],
         fontStyle: 'bold',
         lineColor: [167, 243, 208],
@@ -394,6 +401,7 @@ export function buildQuotationPdf(quote, customProfile = null, settings = undefi
 
   const selectedSettings = settings && Object.keys(settings).length ? settings : readPrintSettingsFromStorage();
   const effectiveSettings = getEffectivePrintSettings(selectedSettings, documentType);
+  const isTallyLedger = effectiveSettings.style === 'tally';
   const theme = getPrintTheme({ ...selectedSettings, ...effectiveSettings }, documentType);
   const primaryColor = hexToRgb(theme.primary);
   const textDark = hexToRgb(theme.secondary);
@@ -435,11 +443,17 @@ export function buildQuotationPdf(quote, customProfile = null, settings = undefi
   doc.text(`${profile.address} | Phone: ${getCompanyPhones(profile)} | GSTIN: ${profile.gstin}`, 105, 21.5, { align: 'center' });
 
   // Badge Title
-  doc.setFillColor(...primaryColor);
-  doc.roundedRect(58, 24, 94, 6, 1.5, 1.5, 'F');
+  doc.setDrawColor(...textDark);
+  doc.setLineWidth(0.3);
+  if (isTallyLedger) {
+    doc.rect(58, 24, 94, 6);
+  } else {
+    doc.setFillColor(...primaryColor);
+    doc.roundedRect(58, 24, 94, 6, 1.5, 1.5, 'F');
+  }
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(...(isTallyLedger ? textDark : [255, 255, 255]));
   doc.text('OFFICIAL ON-ROAD PRICE QUOTATION', 105, 28.2, { align: 'center' });
 
   const custAddr = quote.customerAddress || quote.address || '';
@@ -545,18 +559,22 @@ export function buildQuotationPdf(quote, customProfile = null, settings = undefi
   yPos = doc.lastAutoTable.finalY + 4;
 
   // 4. ESTIMATED ON-ROAD PRICE BOX
-  doc.setFillColor(240, 253, 244);
-  doc.setDrawColor(5, 150, 105);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(114, yPos, 82, 18, 1.5, 1.5, 'FD');
+  doc.setFillColor(...(isTallyLedger ? [255, 255, 255] : [240, 253, 244]));
+  doc.setDrawColor(...(isTallyLedger ? textDark : [5, 150, 105]));
+  doc.setLineWidth(isTallyLedger ? 0.3 : 0.5);
+  if (isTallyLedger) {
+    doc.rect(114, yPos, 82, 18);
+  } else {
+    doc.roundedRect(114, yPos, 82, 18, 1.5, 1.5, 'FD');
+  }
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
-  doc.setTextColor(4, 120, 87);
+  doc.setTextColor(...(isTallyLedger ? textDark : [4, 120, 87]));
   doc.text('Estimated On-Road Price:', 155, yPos + 6, { align: 'center' });
 
   doc.setFontSize(13);
-  doc.setTextColor(21, 128, 61);
+  doc.setTextColor(...(isTallyLedger ? textDark : [21, 128, 61]));
   doc.text(formatRs(total), 155, yPos + 13.5, { align: 'center' });
 
   yPos += 22;
@@ -564,17 +582,21 @@ export function buildQuotationPdf(quote, customProfile = null, settings = undefi
   // 5. TERMS & CONDITIONS
   const termsText = profile.quotationTerms || DEFAULT_PROFILE.quotationTerms || '';
   if (termsText) {
-    doc.setFillColor(249, 250, 251);
-    doc.setDrawColor(229, 231, 235);
+    doc.setFillColor(...(isTallyLedger ? [255, 255, 255] : [249, 250, 251]));
+    doc.setDrawColor(...(isTallyLedger ? textDark : [229, 231, 235]));
     doc.setLineWidth(0.2);
 
     const splitTerms = doc.splitTextToSize(termsText, 174);
     const boxHeight = Math.max(14, splitTerms.length * 3.4 + 7);
-    doc.roundedRect(14, yPos, 182, boxHeight, 1.5, 1.5, 'FD');
+    if (isTallyLedger) {
+      doc.rect(14, yPos, 182, boxHeight);
+    } else {
+      doc.roundedRect(14, yPos, 182, boxHeight, 1.5, 1.5, 'FD');
+    }
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
-    doc.setTextColor(5, 150, 105);
+    doc.setTextColor(...(isTallyLedger ? textDark : [5, 150, 105]));
     doc.text('TERMS & CONDITIONS:', 18, yPos + 4.5);
 
     doc.setFont('helvetica', 'normal');

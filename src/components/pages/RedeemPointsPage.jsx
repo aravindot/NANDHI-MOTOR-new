@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { API_BASE_URL } from '../../config/api';
+import { API_BASE_URL, apiFetch } from '../../config/api';
 import {
   Gift,
   Coins,
@@ -90,8 +90,8 @@ export default function RedeemPointsPage({ customers = [] }) {
     const fetchLoyaltyData = async () => {
       try {
         const [bRes, rRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/loyalty-balances`),
-          fetch(`${API_BASE_URL}/api/redemptions`)
+          apiFetch(`${API_BASE_URL}/api/loyalty-balances`),
+          apiFetch(`${API_BASE_URL}/api/redemptions`)
         ]);
         if (bRes.ok) {
           const bData = await bRes.json();
@@ -182,7 +182,7 @@ export default function RedeemPointsPage({ customers = [] }) {
 
     if (updatedCust) {
       try {
-        fetch(`${API_BASE_URL}/api/loyalty-balances`, {
+        apiFetch(`${API_BASE_URL}/api/loyalty-balances`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedCust)
@@ -193,7 +193,7 @@ export default function RedeemPointsPage({ customers = [] }) {
     }
 
     try {
-      fetch(`${API_BASE_URL}/api/redemptions`, {
+      apiFetch(`${API_BASE_URL}/api/redemptions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newRedemption)

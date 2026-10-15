@@ -11,3 +11,27 @@ export const API_BASE_URL = (() => {
 
   return 'http://localhost:5000';
 })();
+
+export const API_TOKEN_KEY = 'nandhi_app_api_token';
+
+export const setApiToken = (token) => {
+  sessionStorage.setItem(API_TOKEN_KEY, token);
+};
+
+export const clearApiToken = () => {
+  sessionStorage.removeItem(API_TOKEN_KEY);
+};
+
+export const apiFetch = (url, options = {}) => {
+  const headers = new Headers(options.headers || {});
+  const token = sessionStorage.getItem(API_TOKEN_KEY);
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  return fetch(url, { ...options, headers }).then((response) => {
+    if (response.status === 401) {
+      clearApiToken();
+      window.dispatchEvent(new CustomEvent('nandhi:unauthorized'));
+    }
+    return response;
+  });
+};

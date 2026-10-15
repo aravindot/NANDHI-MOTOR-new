@@ -1,4 +1,14 @@
+import { escapeHtml } from './escapeHtml.js';
+
 export const PRINT_STYLE_OPTIONS = [
+  {
+    id: 'tally',
+    label: 'Tally Ledger',
+    tagline: 'Compact, Clear & Accounting-First',
+    description: 'A monochrome ledger-inspired layout with ruled particulars, aligned amounts, compact spacing, and a clearly boxed grand total.',
+    features: ['Black-and-white, ink-friendly output', 'Compact ruled tables', 'Ledger-style customer details', 'Double-ruled grand total'],
+    badge: 'Accounting Ledger'
+  },
   {
     id: 'classic',
     label: 'Classic Formal',
@@ -42,9 +52,9 @@ export const PRINT_DOCUMENT_TYPES = [
 ];
 
 export const DEFAULT_PRINT_SETTINGS = {
-  style: 'classic',
+  style: 'tally',
   color: 'green',
-  presets: Object.fromEntries(PRINT_DOCUMENT_TYPES.map(type => [type.id, { style: 'classic', color: 'green' }]))
+  presets: Object.fromEntries(PRINT_DOCUMENT_TYPES.map(type => [type.id, { style: 'tally', color: 'green' }]))
 };
 
 export const normalizePrintSettings = (settings = {}) => {
@@ -76,6 +86,12 @@ export const getPrintTheme = (settings = {}, documentType = 'default') => {
   const selectedColor = PRINT_COLOR_OPTIONS.find(option => option.id === effective.color) || PRINT_COLOR_OPTIONS[0];
 
   const palette = {
+    tally: {
+      primary: '#111827',
+      secondary: '#111827',
+      tertiary: '#f3f4f6',
+      highlight: '#ffffff'
+    },
     classic: {
       primary: selectedColor.value,
       secondary: '#111827',
@@ -96,7 +112,7 @@ export const getPrintTheme = (settings = {}, documentType = 'default') => {
     }
   };
 
-  const selectedPalette = palette[effective.style] || palette.classic;
+  const selectedPalette = palette[effective.style] || palette.tally;
 
   return {
     ...effective,
@@ -135,6 +151,112 @@ export const buildPrintThemeCss = (settings = DEFAULT_PRINT_SETTINGS, documentTy
       font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
       color: #111827;
       background: #ffffff;
+    }
+
+    /* TALLY LEDGER (Compact, monochrome accounting layout) */
+    .print-style-tally .doc-paper,
+    .print-style-tally.doc-paper {
+      font-family: Arial, 'Segoe UI', sans-serif !important;
+      font-size: 11px !important;
+      color: #111827 !important;
+      background: #ffffff !important;
+    }
+    .print-style-tally .doc-header-banner {
+      text-align: center !important;
+      border-top: 1px solid #111827 !important;
+      border-bottom: 3px double #111827 !important;
+      padding: 8px 0 !important;
+      margin-bottom: 10px !important;
+      background: #ffffff !important;
+    }
+    .print-style-tally .doc-header-banner h1 {
+      color: #111827 !important;
+      font-family: Arial, 'Segoe UI', sans-serif !important;
+      font-size: 20px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.2px !important;
+      margin: 0 !important;
+    }
+    .print-style-tally .doc-header-banner p {
+      color: #111827 !important;
+      font-size: 10px !important;
+      margin: 2px 0 0 !important;
+    }
+    .print-style-tally .doc-badge-title {
+      display: inline-block !important;
+      margin-top: 6px !important;
+      padding: 3px 14px !important;
+      border: 1px solid #111827 !important;
+      border-radius: 0 !important;
+      background: #ffffff !important;
+      color: #111827 !important;
+      font-size: 10px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.7px !important;
+    }
+    .print-style-tally .doc-grid-2 {
+      grid-template-columns: 1fr 1fr !important;
+      gap: 8px !important;
+      margin-bottom: 10px !important;
+    }
+    .print-style-tally .doc-grid-2 > div {
+      border: 1px solid #6b7280 !important;
+      border-radius: 0 !important;
+      padding: 7px 9px !important;
+      background: #ffffff !important;
+      box-shadow: none !important;
+    }
+    .print-style-tally .doc-grid-2 > div > div {
+      color: #111827 !important;
+      border-bottom: 1px solid #9ca3af !important;
+      padding-bottom: 3px !important;
+      margin-bottom: 4px !important;
+    }
+    .print-style-tally .doc-grid-2 p,
+    .print-style-tally .doc-paper strong {
+      color: #111827 !important;
+    }
+    .print-style-tally .doc-paper > div[style*="border-bottom"] {
+      border-color: #6b7280 !important;
+    }
+    .print-style-tally .doc-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      margin: 10px 0 !important;
+      font-size: 10px !important;
+    }
+    .print-style-tally .doc-table th,
+    .print-style-tally .doc-table td {
+      border: 1px solid #6b7280 !important;
+      padding: 5px 6px !important;
+      color: #111827 !important;
+    }
+    .print-style-tally .doc-table th {
+      background: #f3f4f6 !important;
+      font-size: 9px !important;
+      font-weight: 700 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.2px !important;
+    }
+    .print-style-tally .doc-total-box {
+      min-width: 230px !important;
+      border: 1px solid #111827 !important;
+      border-top: 2px solid #111827 !important;
+      border-bottom: 3px double #111827 !important;
+      border-radius: 0 !important;
+      padding: 8px 10px !important;
+      background: #ffffff !important;
+      color: #111827 !important;
+      box-shadow: none !important;
+    }
+    .print-style-tally .doc-total-box * {
+      color: #111827 !important;
+    }
+    .print-style-tally .doc-sig-line {
+      border-color: #111827 !important;
+      border-radius: 0 !important;
+      color: #111827 !important;
+      font-size: 10px !important;
     }
 
     /* ==========================================================================
@@ -485,11 +607,11 @@ export const buildPrintWindowHtml = (title, bodyHtml, settings = DEFAULT_PRINT_S
     <html>
       <head>
         <meta charset="UTF-8" />
-        <title>${title}</title>
+        <title>${escapeHtml(title)}</title>
         <style>${css}</style>
       </head>
-      <body class="print-style-${theme.style || 'classic'}">
-        <div class="print-theme-surface print-style-${theme.style || 'classic'}" style="max-width: 900px; margin: 0 auto; padding: 24px;">
+      <body class="print-style-${theme.style || 'tally'}">
+        <div class="print-theme-surface print-style-${theme.style || 'tally'}" style="max-width: 900px; margin: 0 auto; padding: 24px;">
           ${bodyHtml}
         </div>
       </body>
@@ -512,4 +634,3 @@ export const openThemePrintWindow = (title, bodyHtml, settings = DEFAULT_PRINT_S
   printWindow.close();
   return printWindow;
 };
-

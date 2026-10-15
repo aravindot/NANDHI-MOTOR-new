@@ -19,6 +19,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { getPrintTheme, readPrintSettingsFromStorage, openThemePrintWindow } from '../../utils/printSettings';
+import { escapeHtml } from '../../utils/escapeHtml';
 
 export default function CompanyProfilePage({
   companyProfile = {
@@ -103,16 +104,16 @@ export default function CompanyProfilePage({
     const theme = getPrintTheme(settings);
     const bodyHtml = `
       <div class="print-theme-surface" style="max-width: 440px; text-align: center;">
-        <div class="theme-header" style="text-align: center;">${formData.name}</div>
+        <div class="theme-header" style="text-align: center;">${escapeHtml(formData.name)}</div>
         <div style="margin-top: 20px; font-size: 13px; color: #6b7280;">Scan & Pay with Any UPI App</div>
         <div style="margin: 20px auto; display: inline-block; border: 2px dashed ${theme.primary}; border-radius: 12px; padding: 14px; background: #ffffff;">
-          <img src="${activeQrCodeUrl}" alt="UPI QR Code" style="width: 240px; height: 240px; display: block;" />
+          <img src="${escapeHtml(activeQrCodeUrl)}" alt="UPI QR Code" style="width: 240px; height: 240px; display: block;" />
         </div>
         <div style="display: inline-block; padding: 8px 18px; border-radius: 999px; background: ${theme.highlight}; color: ${theme.primary}; font-family: monospace; font-size: 15px; font-weight: 700; margin-bottom: 14px;">
-          UPI ID: ${formData.upiId || 'nandhimotors@hdfcbank'}
+          UPI ID: ${escapeHtml(formData.upiId || 'nandhimotors@hdfcbank')}
         </div>
         <div style="font-size: 12px; color: #6b7280;">
-          Account: <strong>${formData.accountName || formData.name}</strong> | Bank: <strong>${formData.bankName || 'HDFC Bank'}</strong>
+          Account: <strong>${escapeHtml(formData.accountName || formData.name)}</strong> | Bank: <strong>${escapeHtml(formData.bankName || 'HDFC Bank')}</strong>
         </div>
         <div style="margin-top: 18px; font-size: 12px; color: #4b5563; font-weight: 600; border-top: 1px solid #e5e7eb; padding-top: 14px;">
           ACCEPTED APPS: Google Pay • PhonePe • Paytm • BHIM • Cred • Any UPI App

@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createAuthManager, createLoginRateLimiter, requireAuthentication } from './auth.js';
 
 // Import Models
 import Vehicle from './models/Vehicle.js';
@@ -32,11 +33,53 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const authManager = createAuthManager({
+  username: process.env.APP_USERNAME,
+  password: process.env.APP_PASSWORD
+});
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 
 // Middleware
-app.use(cors());
+app.set('trust proxy', 1);
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error('Origin is not allowed by CORS.'));
+  }
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+const loginRateLimiter = createLoginRateLimiter();
+app.post('/api/auth/login', loginRateLimiter, (req, res) => {
+  if (!authManager.isConfigured) {
+    res.status(503).json({ error: 'Server authentication is not configured.' });
+    return;
+  }
+
+  const session = authManager.login(req.body?.username, req.body?.password);
+  if (!session) {
+    req.recordLoginFailure();
+    res.status(401).json({ error: 'Invalid username or password.' });
+    return;
+  }
+
+  authManager.removeExpiredSessions();
+  res.json(session);
+});
+
+app.post('/api/auth/logout', requireAuthentication(authManager), (req, res) => {
+  authManager.revoke(req.authToken);
+  res.status(204).end();
+});
+
+app.use('/api', requireAuthentication(authManager));
 
 // Database Connection
 mongoose

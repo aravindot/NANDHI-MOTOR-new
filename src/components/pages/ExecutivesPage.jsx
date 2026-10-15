@@ -18,7 +18,7 @@ import {
   Percent,
   X
 } from 'lucide-react';
-import { API_BASE_URL } from '../../config/api';
+import { API_BASE_URL, apiFetch } from '../../config/api';
 
 export default function ExecutivesPage() {
   const [executives, setExecutives] = useState(() => {
@@ -51,7 +51,7 @@ export default function ExecutivesPage() {
   useEffect(() => {
     const fetchExecutives = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/executives`);
+        const res = await apiFetch(`${API_BASE_URL}/api/executives`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -138,7 +138,7 @@ export default function ExecutivesPage() {
       const updatedList = executives.map((e) => (e.id === editingExecutive.id ? updatedEmp : e));
       setExecutives(updatedList);
       try {
-        fetch(`${API_BASE_URL}/api/executives`, {
+        apiFetch(`${API_BASE_URL}/api/executives`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedEmp)
@@ -165,7 +165,7 @@ export default function ExecutivesPage() {
       };
 
       try {
-        const res = await fetch(`${API_BASE_URL}/api/executives`, {
+        const res = await apiFetch(`${API_BASE_URL}/api/executives`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newEmp)
@@ -188,7 +188,7 @@ export default function ExecutivesPage() {
   const handleDeleteExecutive = async (id) => {
     if (window.confirm('Are you sure you want to remove this employee record?')) {
       try {
-        await fetch(`${API_BASE_URL}/api/executives/${id}`, { method: 'DELETE' });
+        await apiFetch(`${API_BASE_URL}/api/executives/${id}`, { method: 'DELETE' });
       } catch (err) {
         console.error('Failed to delete executive:', err);
       }

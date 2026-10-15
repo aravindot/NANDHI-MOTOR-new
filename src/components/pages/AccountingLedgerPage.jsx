@@ -43,6 +43,7 @@ import {
   X
 } from 'lucide-react';
 import { readPrintSettingsFromStorage, openThemePrintWindow } from '../../utils/printSettings';
+import { escapeHtml } from '../../utils/escapeHtml';
 
 export default function AccountingLedgerPage({
   activeSubTab = 'receivable',
@@ -1382,7 +1383,7 @@ export default function AccountingLedgerPage({
     const rows = currentTab === 'receivable' ? filteredReceivables : currentTab === 'payable' ? filteredPayables : currentTab === 'expense' ? filteredExpenses : currentTab === 'general-ledger' ? filteredGlTransactions : currentTab === 'trial-balance' ? trialBalanceData : [];
 
     const tableRows = rows.length ? rows.map(row => {
-      const cells = Object.values(row).slice(0, 6).map(value => `<td>${String(value ?? '')}</td>`).join('');
+      const cells = Object.values(row).slice(0, 6).map(value => `<td>${escapeHtml(value)}</td>`).join('');
       return `<tr>${cells}</tr>`;
     }).join('') : '<tr><td colspan="6">No data available for the selected tab.</td></tr>';
 

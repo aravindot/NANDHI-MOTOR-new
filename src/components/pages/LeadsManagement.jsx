@@ -3,7 +3,7 @@ import { UserPlus, Search, Phone, CheckCircle, Trash2, Calendar, Clipboard, Calc
 import PrintPreviewModal from '../PrintPreviewModal';
 import { generateQuotationPdfAndShare, generateInvoicePdfAndShare } from '../../utils/pdfShareUtil';
 import { formatAadhar } from '../../utils/formatUtils';
-import { API_BASE_URL } from '../../config/api';
+import { API_BASE_URL, apiFetch } from '../../config/api';
 
 export default function LeadsManagement({
   activeSubTab,
@@ -767,7 +767,7 @@ export default function LeadsManagement({
   useEffect(() => {
     const fetchBookings = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/bookings`);
+        const res = await apiFetch(`${API_BASE_URL}/api/bookings`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -824,7 +824,7 @@ export default function LeadsManagement({
       const updated = { ...b, status: 'Converted' };
       setBookings(prev => prev.map(item => item.id === b.id ? updated : item));
       try {
-        fetch(`${API_BASE_URL}/api/bookings`, {
+        apiFetch(`${API_BASE_URL}/api/bookings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updated)
@@ -871,7 +871,7 @@ export default function LeadsManagement({
     setTimeout(() => setBookingSuccessMsg(''), 4000);
 
     try {
-      await fetch(`${API_BASE_URL}/api/bookings`, {
+      await apiFetch(`${API_BASE_URL}/api/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)
@@ -883,7 +883,7 @@ export default function LeadsManagement({
 
   const deleteBooking = async (id) => {
     try {
-      await fetch(`${API_BASE_URL}/api/bookings/${id}`, {
+      await apiFetch(`${API_BASE_URL}/api/bookings/${id}`, {
         method: 'DELETE'
       });
     } catch (err) {
@@ -912,7 +912,7 @@ export default function LeadsManagement({
     setTimeout(() => setBookingSuccessMsg(''), 4000);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/bookings`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newBooking)

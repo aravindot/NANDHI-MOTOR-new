@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, ToggleLeft, ToggleRight, Info, FileText, Save, Check, RefreshCw, ShieldAlert, Wrench, X, Palette, Printer, Sparkles, Award, CheckCircle2, Layers, Layout } from 'lucide-react';
 import { DEFAULT_PRINT_SETTINGS, PRINT_STYLE_OPTIONS, PRINT_COLOR_OPTIONS, PRINT_DOCUMENT_TYPES, openThemePrintWindow, getPrintTheme, normalizePrintSettings, buildPrintThemeCss } from '../../utils/printSettings';
+import { escapeHtml } from '../../utils/escapeHtml';
 
 export const DEFAULT_QUOTATION_TERMS = `1. Prices quoted are valid for 7 days from the date of issuance and subject to manufacturer price revisions.
 2. Final delivery is subject to availability of vehicle stock and color chosen at the time of final booking.
@@ -105,15 +106,19 @@ export default function SettingsPage({
       phone: '+91 7604857272',
       gstin: '33BCXPA4714R1Z2'
     };
+    const printStyle = PRINT_STYLE_OPTIONS.some(option => option.id === localPrintSettings.style)
+      ? localPrintSettings.style
+      : DEFAULT_PRINT_SETTINGS.style;
+    const escape = escapeHtml;
 
     const bodyHtml = `
-      <div class="doc-paper print-style-${localPrintSettings.style || 'classic'}">
+      <div class="doc-paper print-style-${printStyle}">
         <div class="doc-header-banner">
           <div>
-            <h1>${profile.name || 'NANDHI MOTORS'}</h1>
-            <p>${profile.tagline || 'Authorized Two-Wheeler Sales, Genuine Spares & Service Dealership'}</p>
+            <h1>${escape(profile.name || 'NANDHI MOTORS')}</h1>
+            <p>${escape(profile.tagline || 'Authorized Two-Wheeler Sales, Genuine Spares & Service Dealership')}</p>
             <p style="font-size: 11px; color: #6b7280;">
-              ${profile.address || '170/2, ITTERI ROAD, PALANI-624601'} | Phone: ${profile.phone || '+91 7604857272'} | GSTIN: ${profile.gstin || '33BCXPA4714R1Z2'}
+              ${escape(profile.address || '170/2, ITTERI ROAD, PALANI-624601')} | Phone: ${escape(profile.phone || '+91 7604857272')} | GSTIN: ${escape(profile.gstin || '33BCXPA4714R1Z2')}
             </p>
           </div>
           <div class="doc-badge-title">${docTitle.toUpperCase()}</div>
@@ -137,7 +142,7 @@ export default function SettingsPage({
             <p style="margin: 2px 0;"><strong>Model:</strong> Honda Activa 6G (Matte Blue)</p>
             <p style="margin: 2px 0;"><strong>VIN / Reg:</strong> TN-57-AB-1234</p>
             <p style="margin: 2px 0;"><strong>Service Type:</strong> Periodic Maintenance</p>
-            <p style="margin: 2px 0;"><strong>Layout:</strong> ${localPrintSettings.style.toUpperCase()} (${theme.colorLabel})</p>
+            <p style="margin: 2px 0;"><strong>Layout:</strong> ${escape(printStyle.toUpperCase())} (${escape(theme.colorLabel)})</p>
           </div>
         </div>
 
@@ -204,7 +209,7 @@ export default function SettingsPage({
       </div>
     `;
 
-    openThemePrintWindow(`${docTitle} Test (${localPrintSettings.style})`, bodyHtml, localPrintSettings, selectedDocumentPreset);
+    openThemePrintWindow(`${docTitle} Test (${printStyle})`, bodyHtml, localPrintSettings, selectedDocumentPreset);
   };
 
   const handleResetTerms = () => {
@@ -349,11 +354,11 @@ export default function SettingsPage({
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 4px 0', color: '#111827' }}>Printing Layouts & Styles</h3>
                 <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '999px', backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>
-                  {PRINT_STYLE_OPTIONS.find(s => s.id === localPrintSettings.style)?.label || 'Classic Formal'}
+                  {PRINT_STYLE_OPTIONS.find(s => s.id === localPrintSettings.style)?.label || 'Tally Ledger'}
                 </span>
               </div>
               <p style={{ margin: 0, fontSize: '0.85rem', color: '#6b7280' }}>
-                3 latest showroom print layouts: Classic Formal, Modern Minimal, or Executive Premium.
+                {PRINT_STYLE_OPTIONS.length} layouts, including Tally Ledger, Classic Formal, Modern Minimal, and Executive Premium.
               </p>
             </div>
           </div>
@@ -689,11 +694,11 @@ export default function SettingsPage({
                           <Layout size={18} color="#7c3aed" /> Select Dealership Print Layout
                         </h4>
                         <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#6b7280' }}>
-                          Choose from the 3 latest automotive dealership printing styles for all invoices, quotes, and job cards.
+                          Choose a print layout for invoices, quotes, job cards, and other documents.
                         </p>
                       </div>
                       <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#7c3aed', backgroundColor: '#f3e8ff', padding: '3px 10px', borderRadius: '999px' }}>
-                        3 Styles Available
+                        {PRINT_STYLE_OPTIONS.length} Styles Available
                       </span>
                     </div>
 
@@ -944,7 +949,7 @@ export default function SettingsPage({
                       maxHeight: '360px',
                       boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
                     }}>
-                      <div className={`doc-paper print-style-${localPrintSettings.style || 'classic'}`} style={{
+                      <div className={`doc-paper print-style-${localPrintSettings.style || 'tally'}`} style={{
                         maxWidth: '780px',
                         margin: '0 auto',
                         backgroundColor: '#ffffff',

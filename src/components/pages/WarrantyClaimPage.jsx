@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ShieldCheck, Plus, Search, Filter, Printer, CheckCircle, Clock, XCircle, AlertTriangle, FileText, Check, ChevronDown, Truck, Edit3, Mail } from 'lucide-react';
 import PrintPreviewModal from '../PrintPreviewModal';
-import { API_BASE_URL } from '../../config/api';
+import { API_BASE_URL, apiFetch } from '../../config/api';
 import { buildWarrantyClaimMail } from '../../utils/warrantyMailUtil';
 
 export default function WarrantyClaimPage({
@@ -87,7 +87,7 @@ export default function WarrantyClaimPage({
   useEffect(() => {
     const fetchClaims = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/warranties`);
+        const res = await apiFetch(`${API_BASE_URL}/api/warranties`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -193,7 +193,7 @@ export default function WarrantyClaimPage({
       setClaims(nextClaims);
 
       try {
-        await fetch(`${API_BASE_URL}/api/warranties`, {
+        await apiFetch(`${API_BASE_URL}/api/warranties`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedClaim)
@@ -210,7 +210,7 @@ export default function WarrantyClaimPage({
       };
 
       try {
-        const res = await fetch(`${API_BASE_URL}/api/warranties`, {
+        const res = await apiFetch(`${API_BASE_URL}/api/warranties`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newClaim)
@@ -261,7 +261,7 @@ export default function WarrantyClaimPage({
     setClaims(nextClaims);
 
     try {
-      await fetch(`${API_BASE_URL}/api/warranties/${id}`, {
+      await apiFetch(`${API_BASE_URL}/api/warranties/${id}`, {
         method: 'DELETE'
       });
     } catch (err) {
@@ -289,7 +289,7 @@ export default function WarrantyClaimPage({
     localStorage.setItem('nandhi_warranty_claims', JSON.stringify(nextClaims));
     if (updatedTrackingClaim) {
       try {
-        fetch(`${API_BASE_URL}/api/warranties`, {
+        apiFetch(`${API_BASE_URL}/api/warranties`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedTrackingClaim)
@@ -319,7 +319,7 @@ export default function WarrantyClaimPage({
 
     if (updatedClaim) {
       try {
-        await fetch(`${API_BASE_URL}/api/warranties`, {
+        await apiFetch(`${API_BASE_URL}/api/warranties`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedClaim)

@@ -16,17 +16,12 @@ import AlertsPage from './components/pages/AlertsPage';
 import BirthdayWishesPage from './components/pages/BirthdayWishesPage';
 import RedeemPointsPage from './components/pages/RedeemPointsPage';
 import CompanyProfilePage from './components/pages/CompanyProfilePage';
-import { API_BASE_URL } from './config/api';
+import { API_BASE_URL, apiFetch, clearApiToken, setApiToken } from './config/api';
 import { isSessionExpired, refreshSessionExpiry as extendSessionExpiry } from './utils/sessionTimeout';
 import { DEFAULT_PRINT_SETTINGS, readPrintSettingsFromStorage, buildPrintThemeCss } from './utils/printSettings';
 
 const SESSION_KEY = 'nandhi_app_session';
 const SESSION_TIMEOUT_KEY = 'nandhi_app_session_expires_at';
-
-const APP_CREDENTIALS = {
-  username: 'NANDHI MOTORS',
-  password: 'Nandhi@1234'
-};
 
 const readLocalStorageJson = (key, fallback) => {
   try {
@@ -79,21 +74,23 @@ const mergeCollections = (backendList, localList, idKey = 'id') => {
 
 const syncToBackend = async (path, item) => {
   try {
-    await fetch(`${API_BASE_URL}${path}`, {
+    const response = await apiFetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item)
     });
+    if (!response.ok) {
+      console.error(`Failed to sync ${path} with backend: ${response.status} ${response.statusText}`);
+    }
   } catch (e) {
-    // Offline or network error; local state remains source of truth
+    console.error(`Failed to sync ${path} with backend:`, e);
   }
 };
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     try {
-      const loggedIn = localStorage.getItem(SESSION_KEY) === 'true';
-      if (!loggedIn) return false;
+      if (!sessionStorage.getItem('nandhi_app_api_token')) return false;
       const expiresAt = Number(localStorage.getItem(SESSION_TIMEOUT_KEY) || 0);
       return !isSessionExpired(expiresAt, Date.now());
     } catch (error) {
@@ -103,6 +100,7 @@ export default function App() {
 
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const clearSessionExpiry = () => {
     try {
@@ -138,6 +136,10 @@ export default function App() {
     const checkSession = () => {
       const expiresAt = Number(localStorage.getItem(SESSION_TIMEOUT_KEY) || 0);
       if (isSessionExpired(expiresAt, Date.now())) {
+        apiFetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST' }).catch((error) => {
+          console.error('Unable to revoke the expired API session.', error);
+        });
+        clearApiToken();
         setIsAuthenticated(false);
         setLoginForm({ username: '', password: '' });
         setLoginError('');
@@ -155,6 +157,10 @@ export default function App() {
     const keepAlive = () => {
       const expiresAt = Number(localStorage.getItem(SESSION_TIMEOUT_KEY) || 0);
       if (isSessionExpired(expiresAt, Date.now())) {
+        apiFetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST' }).catch((error) => {
+          console.error('Unable to revoke the expired API session.', error);
+        });
+        clearApiToken();
         setIsAuthenticated(false);
         setLoginForm({ username: '', password: '' });
         setLoginError('');
@@ -174,23 +180,58 @@ export default function App() {
     };
   }, [isAuthenticated]);
 
-  const handleLogin = (event) => {
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      clearApiToken();
+      localStorage.removeItem(SESSION_KEY);
+      clearSessionExpiry();
+      setIsAuthenticated(false);
+      setLoginForm({ username: '', password: '' });
+      setLoginError('Your secure session expired. Please sign in again.');
+    };
+    window.addEventListener('nandhi:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('nandhi:unauthorized', handleUnauthorized);
+  }, []);
+
+  const handleLogin = async (event) => {
     event.preventDefault();
     const username = String(loginForm.username).trim();
     const password = String(loginForm.password);
 
-    if (
-      username.toLowerCase() === APP_CREDENTIALS.username.toLowerCase() &&
-      password === APP_CREDENTIALS.password
-    ) {
+    setIsLoggingIn(true);
+    setLoginError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      if (response.status === 401) {
+        setLoginError('Invalid username or password.');
+        return;
+      }
+      if (response.status === 429) {
+        setLoginError('Too many login attempts. Please try again later.');
+        return;
+      }
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || `Secure sign-in failed (${response.status}).`);
+      }
+
+      const { token } = await response.json();
+      if (!token) throw new Error('The server did not return a secure session token.');
+      setApiToken(token);
       setIsAuthenticated(true);
       setLoginError('');
       localStorage.setItem(SESSION_KEY, 'true');
       localStorage.setItem(SESSION_TIMEOUT_KEY, String(extendSessionExpiry(Date.now())));
-      return;
+    } catch (error) {
+      console.error('Secure sign-in failed:', error);
+      setLoginError(error.message || 'Unable to reach the secure sign-in service.');
+    } finally {
+      setIsLoggingIn(false);
     }
-
-    setLoginError('Invalid username or password');
   };
 
 
@@ -374,7 +415,7 @@ export default function App() {
   }, [showPreviews]);
 
   // Logout handler that safely flushes current state to localStorage before deauthenticating
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
       localStorage.setItem('nandhi_app_leads', JSON.stringify(leads));
       localStorage.setItem('nandhi_app_customers', JSON.stringify(customers));
@@ -394,6 +435,15 @@ export default function App() {
       console.warn('Unable to flush state to localStorage on logout', e);
     }
 
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST' });
+      if (!response.ok && response.status !== 401) {
+        console.error(`Unable to revoke API session: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Unable to revoke API session during logout:', error);
+    }
+    clearApiToken();
     setIsAuthenticated(false);
     setLoginForm({ username: '', password: '' });
     setLoginError('');
@@ -430,7 +480,7 @@ export default function App() {
     try {
       const fetchEndpoint = async (url) => {
         try {
-          const res = await fetch(url);
+          const res = await apiFetch(url);
           if (res.ok) return await res.json();
         } catch (e) {
           // Individual route failure
@@ -512,10 +562,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    initData();
-  }, [initData]);
-
-  useEffect(() => {
     if (isAuthenticated) {
       initData();
     }
@@ -535,7 +581,7 @@ export default function App() {
     }
     for (const v of deleted) {
       try {
-        await fetch(`${API_BASE_URL}/api/vehicles/${v.id}`, { method: 'DELETE' });
+        await apiFetch(`${API_BASE_URL}/api/vehicles/${v.id}`, { method: 'DELETE' });
       } catch (e) {
         console.error('Failed to sync deleted vehicle with MongoDB:', e);
       }
@@ -558,7 +604,7 @@ export default function App() {
   // Add or Update a Lead in backend database
   const addLead = async (leadPayload) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/leads`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/leads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(leadPayload)
@@ -595,7 +641,7 @@ export default function App() {
   // Update an existing Lead in backend database
   const updateLead = async (id, updatedFields) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/leads/${id}`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/leads/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedFields)
@@ -615,7 +661,7 @@ export default function App() {
   // Delete a Lead from backend database
   const deleteLead = async (leadId) => {
     try {
-      await fetch(`${API_BASE_URL}/api/leads/${leadId}`, {
+      await apiFetch(`${API_BASE_URL}/api/leads/${leadId}`, {
         method: 'DELETE'
       });
     } catch (err) {
@@ -650,7 +696,7 @@ export default function App() {
     for (const c of deleted) {
       try {
         const idToDelete = c.id || c.mobile;
-        await fetch(`${API_BASE_URL}/api/customers/${idToDelete}`, { method: 'DELETE' });
+        await apiFetch(`${API_BASE_URL}/api/customers/${idToDelete}`, { method: 'DELETE' });
       } catch (e) {
         console.error('Failed to sync deleted customer with MongoDB:', e);
       }
@@ -683,7 +729,7 @@ export default function App() {
     }
     for (const s of deleted) {
       try {
-        await fetch(`${API_BASE_URL}/api/spares/${s.id}`, { method: 'DELETE' });
+        await apiFetch(`${API_BASE_URL}/api/spares/${s.id}`, { method: 'DELETE' });
       } catch (e) {
         console.error('Failed to sync deleted spare with MongoDB:', e);
       }
@@ -715,7 +761,7 @@ export default function App() {
     };
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/customers`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/customers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(customerPayload)
@@ -774,7 +820,7 @@ export default function App() {
     });
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/invoices`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/invoices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -794,7 +840,7 @@ export default function App() {
   const deleteInvoice = async (invoiceNo) => {
     setInvoices(prev => prev.filter(inv => String(inv.invoiceNo) !== String(invoiceNo)));
     try {
-      await fetch(`${API_BASE_URL}/api/invoices/${invoiceNo}`, {
+      await apiFetch(`${API_BASE_URL}/api/invoices/${invoiceNo}`, {
         method: 'DELETE'
       });
     } catch (err) {
@@ -827,7 +873,7 @@ export default function App() {
     });
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/quotations`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/quotations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -847,7 +893,7 @@ export default function App() {
   const deleteQuotation = async (quoteId) => {
     setQuotations(prev => prev.filter(q => String(q.quoteId) !== String(quoteId)));
     try {
-      await fetch(`${API_BASE_URL}/api/quotations/${quoteId}`, {
+      await apiFetch(`${API_BASE_URL}/api/quotations/${quoteId}`, {
         method: 'DELETE'
       });
     } catch (err) {
@@ -869,7 +915,7 @@ export default function App() {
     }
     for (const j of deleted) {
       try {
-        await fetch(`${API_BASE_URL}/api/jobsheets/${j.id}`, { method: 'DELETE' });
+        await apiFetch(`${API_BASE_URL}/api/jobsheets/${j.id}`, { method: 'DELETE' });
       } catch (e) {
         console.error('Failed to sync deleted job sheet with MongoDB:', e);
       }
@@ -903,7 +949,7 @@ export default function App() {
     }
     for (const b of deleted) {
       try {
-        await fetch(`${API_BASE_URL}/api/service-bills/${b.id}`, { method: 'DELETE' });
+        await apiFetch(`${API_BASE_URL}/api/service-bills/${b.id}`, { method: 'DELETE' });
       } catch (e) {
         console.error('Failed to sync deleted service bill with MongoDB:', e);
       }
@@ -937,7 +983,7 @@ export default function App() {
     }
     for (const exp of deleted) {
       try {
-        await fetch(`${API_BASE_URL}/api/expenses/${exp.id}`, { method: 'DELETE' });
+        await apiFetch(`${API_BASE_URL}/api/expenses/${exp.id}`, { method: 'DELETE' });
       } catch (e) {
         console.error('Failed to delete expense from MongoDB:', e);
       }
@@ -971,7 +1017,7 @@ export default function App() {
     }
     for (const pur of deleted) {
       try {
-        await fetch(`${API_BASE_URL}/api/purchases/${pur.id}`, { method: 'DELETE' });
+        await apiFetch(`${API_BASE_URL}/api/purchases/${pur.id}`, { method: 'DELETE' });
       } catch (e) {
         console.error('Failed to delete purchase invoice from MongoDB:', e);
       }
@@ -1004,7 +1050,7 @@ export default function App() {
     localStorage.setItem('nandhi_app_company_profile', JSON.stringify(nextWithPrintSettings));
     localStorage.setItem('nandhi_company_profile', JSON.stringify(nextWithPrintSettings));
     try {
-      await fetch(`${API_BASE_URL}/api/company-profile`, {
+      await apiFetch(`${API_BASE_URL}/api/company-profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nextWithPrintSettings)
@@ -1158,7 +1204,9 @@ export default function App() {
 
             {loginError && <div className="login-error">{loginError}</div>}
 
-            <button type="submit" className="login-button">Login</button>
+            <button type="submit" className="login-button" disabled={isLoggingIn}>
+              {isLoggingIn ? 'Signing in...' : 'Login'}
+            </button>
           </form>
         </div>
       </div>

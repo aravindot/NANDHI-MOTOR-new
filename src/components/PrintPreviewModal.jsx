@@ -494,7 +494,7 @@ export default function PrintPreviewModal({
 
         {/* Modal Printable Paper Body with Dedicated Scroll */}
         <div id="print-scroll-container" className="print-modal-body">
-          <div ref={docRef} className={`doc-paper print-style-${theme.style || 'classic'}`}>
+          <div ref={docRef} className={`doc-paper print-style-${theme.style || 'tally'}`}>
             {/* Header Title */}
             <div className="doc-header-banner">
               <div>
